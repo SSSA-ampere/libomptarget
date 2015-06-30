@@ -111,85 +111,84 @@ extern "C" {
 #endif
 
 cloud_hdfs_t* _cloud_hdfs_init(char *servAddress, int servPort, char* userName) {
-    cloud_hdfs_t *hdfs = (cloud_hdfs_t*) malloc(sizeof(cloud_hdfs_t));
-    hdfs->ServAddress = servAddress;
-    hdfs->ServPort = servPort;
-    hdfs->UserName = userName;
-    return hdfs;
+  cloud_hdfs_t *hdfs = (cloud_hdfs_t*) malloc(sizeof(cloud_hdfs_t));
+  hdfs->ServAddress = servAddress;
+  hdfs->ServPort = servPort;
+  hdfs->UserName = userName;
+  return hdfs;
 }
 
 int _cloud_hdfs_connect(cloud_hdfs_t *cloud) {
-    struct hdfsBuilder *builder = hdfsNewBuilder();
-    hdfsBuilderSetNameNode(builder, cloud->ServAddress);
-    hdfsBuilderSetNameNodePort(builder, cloud->ServPort);
-    hdfsBuilderSetUserName(builder, cloud->UserName);
-    cloud->Node = hdfsBuilderConnect(builder);
-    hdfsFreeBuilder(builder);
-    return 0;
+  struct hdfsBuilder *builder = hdfsNewBuilder();
+  hdfsBuilderSetNameNode(builder, cloud->ServAddress);
+  hdfsBuilderSetNameNodePort(builder, cloud->ServPort);
+  hdfsBuilderSetUserName(builder, cloud->UserName);
+  cloud->Node = hdfsBuilderConnect(builder);
+  hdfsFreeBuilder(builder);
+  return 0;
 }
 
 int _cloud_hdfs_disconnect(cloud_hdfs_t *cloud) {
-    hdfsFS fs = (hdfsFS) cloud->Node;
-    return hdfsDisconnect(fs);
+  hdfsFS fs = (hdfsFS) cloud->Node;
+  return hdfsDisconnect(fs);
 }
 
 int _cloud_hdfs_send(cloud_hdfs_t *cloud, char *id, void *buffer, int bufSize) {
-    hdfsFS fs = (hdfsFS) cloud->Node;
-    hdfsFile file = hdfsOpenFile(fs, id, O_WRONLY, 0, 0, 0);
+  hdfsFS fs = (hdfsFS) cloud->Node;
+  hdfsFile file = hdfsOpenFile(fs, id, O_WRONLY, 0, 0, 0);
 
-    int retval = hdfsWrite(fs, file, buffer, bufSize);
-    retval = hdfsCloseFile(fs, file);
-    return 0;
+  int retval = hdfsWrite(fs, file, buffer, bufSize);
+  retval = hdfsCloseFile(fs, file);
+  return 0;
 }
 
 int _cloud_hdfs_send_int(cloud_hdfs_t *cloud, char *id, int *buffer, int bufSize) {
-    hdfsFS fs = (hdfsFS) cloud->Node;
-    hdfsFile file = hdfsOpenFile(fs, id, O_WRONLY, 0, 0, 0);
-    int i;
-    int retval;
-    for(i=0; i<bufSize; i++) {
-        char str[10] = "";
-        sprintf(str, "%*d ", 8, buffer[i]);
-        retval = hdfsWrite(fs, file, str, 10*sizeof(char));
+  hdfsFS fs = (hdfsFS) cloud->Node;
+  hdfsFile file = hdfsOpenFile(fs, id, O_WRONLY, 0, 0, 0);
+  int i;
+  int retval;
+  for(i=0; i<bufSize; i++) {
+    char str[10] = "";
+    sprintf(str, "%*d ", 8, buffer[i]);
+    retval = hdfsWrite(fs, file, str, 10*sizeof(char));
 
-        //hdfsFlush(fs, file);
-    }
+    //hdfsFlush(fs, file);
+  }
 
-    retval = hdfsCloseFile(fs, file);
-    return 0;
+  retval = hdfsCloseFile(fs, file);
+  return 0;
 }
 
 int _cloud_hdfs_receive(cloud_hdfs_t *cloud, char *id, void *buffer, int bufSize) {
-    hdfsFS fs = (hdfsFS) cloud->Node;
-    hdfsFile file = hdfsOpenFile(fs, id, O_RDONLY, 0, 0, 0);
-    int retval = hdfsRead(fs, file, buffer, bufSize);
-    retval = hdfsCloseFile(fs, file);
-    return 0;
+  hdfsFS fs = (hdfsFS) cloud->Node;
+  hdfsFile file = hdfsOpenFile(fs, id, O_RDONLY, 0, 0, 0);
+  int retval = hdfsRead(fs, file, buffer, bufSize);
+  retval = hdfsCloseFile(fs, file);
+  return 0;
 }
 
 cloud_spark_t* _cloud_spark_init(char *adress, int port) {
-    cloud_spark_t *spark = (cloud_spark_t*) malloc(sizeof(cloud_spark_t));
-    return spark;
+  cloud_spark_t *spark = (cloud_spark_t*) malloc(sizeof(cloud_spark_t));
+  return spark;
 }
 
 int _cloud_spark_connect(cloud_spark_t *cloud) {
-
-    return 0;
+  return 0;
 }
 
 int _cloud_spark_create_program(cloud_hdfs_t *cloud) {
-    // 1/ Generate scala code (with template)
-    // 2/ Compile in jar -> system("sbt package");
-    // 3/ Generate native kernel code (map function)
-    // 4/ Compile
-    // 5/ Upload to HDFS
-    return 0;
+  // 1/ Generate scala code (with template)
+  // 2/ Compile in jar -> system("sbt package");
+  // 3/ Generate native kernel code (map function)
+  // 4/ Compile
+  // 5/ Upload to HDFS
+  return 0;
 }
 
 int _cloud_spark_launch(cloud_spark_t *cloud) {
-    //system("spark-submit --class test.dummy.HdfsTest /Users/hyviquel/tmp/test/target/scala-2.11/test_2.11-0.1.0.jar");
-    system("spark-submit --class test.dummy.FullTest /Users/hyviquel/tmp/test/target/scala-2.11/test_2.11-0.1.0.jar");
-    return 0;
+  //system("spark-submit --class test.dummy.HdfsTest /Users/hyviquel/tmp/test/target/scala-2.11/test_2.11-0.1.0.jar");
+  system("spark-submit --class test.dummy.FullTest /Users/hyviquel/tmp/test/target/scala-2.11/test_2.11-0.1.0.jar");
+  return 0;
 }
 
 int __tgt_rtl_device_type(int32_t device_id){
@@ -272,7 +271,7 @@ int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
   void **tgt_args, int32_t arg_num)
 {
   // use one team and one thread
-  return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr, 
+  return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr,
     tgt_args, arg_num, 1, 1);
 }
 
