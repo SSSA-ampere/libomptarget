@@ -26,7 +26,7 @@
 #include "omptarget.h"
 
 #ifndef TARGET_NAME
-#define TARGET_NAME Generic-64bit
+#define TARGET_NAME Cloud
 #endif
 
 #define GETNAME2(name) #name
@@ -205,6 +205,7 @@ int __tgt_rtl_number_of_devices(){
 }
 
 int32_t __tgt_rtl_init_device(int32_t device_id){
+  // TODO: init connection to HDFS and Spark servers
   _cloud_hdfs_init(NULL, 0, NULL);
   _cloud_spark_init(NULL, 0);
   return OFFLOAD_SUCCESS; // success
@@ -221,99 +222,28 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   size_t NumEntries = (size_t) (image->EntriesEnd - image->EntriesBegin);
   DP("Expecting to have %ld entries defined.\n", (long)NumEntries);
 
-  // We do not need to set the ELF version because the caller of this function
-  // had to do that to decide the right runtime to use
-
-  //Obtain elf handler
-  Elf *e = elf_memory ((char*)image->ImageStart, ImageSize);
-  if(!e){
-    DP("Unable to get ELF handle: %s!\n", elf_errmsg(-1));
-    return NULL;
-  }
-
-  if( elf_kind(e) !=  ELF_K_ELF){
-    DP("Invalid Elf kind!\n");
-    elf_end(e);
-    return NULL;
-  }
-
-  //Find the entries section offset
-  Elf_Scn *section = 0;
-  Elf64_Off entries_offset = 0;
-
-  size_t shstrndx;
-
-  if (elf_getshdrstrndx (e , &shstrndx )) {
-    DP("Unable to get ELF strings index!\n");
-    elf_end(e);
-    return NULL;
-  }
-
-  while ((section = elf_nextscn(e,section))) {
-    GElf_Shdr hdr;
-    gelf_getshdr(section, &hdr);
-
-    if (!strcmp(elf_strptr(e,shstrndx,hdr.sh_name),".openmptgt_host_entries")){
-      entries_offset = hdr.sh_addr;
-      break;
-    }
-  }
-
-  if (!entries_offset) {
-    DP("Entries Section Offset Not Found\n");
-    elf_end(e);
-    return NULL;
-  }
-
-  DP("Offset of entries section is (%016lx).\n", entries_offset);
-
-  // load dynamic library and get the entry points. We use the dl library
-  // to do the loading of the library, but we could do it directly to avoid the
-  // dump to the temporary file.
-  //
-  // 1) Create tmp file with the library contents
-  // 2) Use dlopen to load the file and dlsym to retrieve the symbols
-  char tmp_name[] = "/tmp/tmpfile_XXXXXX";
-  int tmp_fd = mkstemp (tmp_name);
-
-  if( tmp_fd == -1 ){
-    elf_end(e);
-    return NULL;
-  }
-
-  FILE *ftmp = fdopen(tmp_fd, "wb");
-
-  if( !ftmp ){
-    elf_end(e);
-    return NULL;
-  }
-
-  fwrite(image->ImageStart,ImageSize,1,ftmp);
-  fclose(ftmp);
-
-
-  elf_end(e);
+  // TODO
 
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size){
-  void *ptr = malloc(size);
-  return ptr;
+  // TODO: create HDFS file
+  return NULL;
 }
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, int64_t size){
-  memcpy(tgt_ptr,hst_ptr,size);
+  // TODO: write into HDFS file
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr, int64_t size){
-  memcpy(hst_ptr,tgt_ptr,size);
+  // TODO: read from HDFS file
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr){
-  free(tgt_ptr);
+  // TODO: remove HDFS file
   return OFFLOAD_SUCCESS;
 }
 
