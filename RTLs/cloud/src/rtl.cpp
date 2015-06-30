@@ -35,18 +35,18 @@
 
 #define NUMBER_OF_DEVICES 4
 
-typedef struct {
-    char *servAddress;
-    int servPort;
-    char *userName;
-    void *node;
-} cloud_hdfs_t;
+struct cloud_hdfs_t{
+  char *ServAddress;
+  int ServPort;
+  char *UserName;
+  void *Node;
+};
 
-typedef struct {
-    char *name;
-    char *url;
-    int port;
-} cloud_spark_t;
+struct cloud_spark_t {
+  char *Name;
+  char *Url;
+  int Port;
+};
 
 
 /// Keep entries table per device
@@ -112,29 +112,29 @@ extern "C" {
 
 cloud_hdfs_t* _cloud_hdfs_init(char *servAddress, int servPort, char* userName) {
     cloud_hdfs_t *hdfs = (cloud_hdfs_t*) malloc(sizeof(cloud_hdfs_t));
-    hdfs->servAddress = servAddress;
-    hdfs->servPort = servPort;
-    hdfs->userName = userName;
+    hdfs->ServAddress = servAddress;
+    hdfs->ServPort = servPort;
+    hdfs->UserName = userName;
     return hdfs;
 }
 
 int _cloud_hdfs_connect(cloud_hdfs_t *cloud) {
     struct hdfsBuilder *builder = hdfsNewBuilder();
-    hdfsBuilderSetNameNode(builder, cloud->servAddress);
-    hdfsBuilderSetNameNodePort(builder, cloud->servPort);
-    hdfsBuilderSetUserName(builder, cloud->userName);
-    cloud->node = hdfsBuilderConnect(builder);
+    hdfsBuilderSetNameNode(builder, cloud->ServAddress);
+    hdfsBuilderSetNameNodePort(builder, cloud->ServPort);
+    hdfsBuilderSetUserName(builder, cloud->UserName);
+    cloud->Node = hdfsBuilderConnect(builder);
     hdfsFreeBuilder(builder);
     return 0;
 }
 
 int _cloud_hdfs_disconnect(cloud_hdfs_t *cloud) {
-    hdfsFS fs = (hdfsFS) cloud->node;
+    hdfsFS fs = (hdfsFS) cloud->Node;
     return hdfsDisconnect(fs);
 }
 
 int _cloud_hdfs_send(cloud_hdfs_t *cloud, char *id, void *buffer, int bufSize) {
-    hdfsFS fs = (hdfsFS) cloud->node;
+    hdfsFS fs = (hdfsFS) cloud->Node;
     hdfsFile file = hdfsOpenFile(fs, id, O_WRONLY, 0, 0, 0);
 
     int retval = hdfsWrite(fs, file, buffer, bufSize);
@@ -143,7 +143,7 @@ int _cloud_hdfs_send(cloud_hdfs_t *cloud, char *id, void *buffer, int bufSize) {
 }
 
 int _cloud_hdfs_send_int(cloud_hdfs_t *cloud, char *id, int *buffer, int bufSize) {
-    hdfsFS fs = (hdfsFS) cloud->node;
+    hdfsFS fs = (hdfsFS) cloud->Node;
     hdfsFile file = hdfsOpenFile(fs, id, O_WRONLY, 0, 0, 0);
     int i;
     int retval;
@@ -160,7 +160,7 @@ int _cloud_hdfs_send_int(cloud_hdfs_t *cloud, char *id, int *buffer, int bufSize
 }
 
 int _cloud_hdfs_receive(cloud_hdfs_t *cloud, char *id, void *buffer, int bufSize) {
-    hdfsFS fs = (hdfsFS) cloud->node;
+    hdfsFS fs = (hdfsFS) cloud->Node;
     hdfsFile file = hdfsOpenFile(fs, id, O_RDONLY, 0, 0, 0);
     int retval = hdfsRead(fs, file, buffer, bufSize);
     retval = hdfsCloseFile(fs, file);
