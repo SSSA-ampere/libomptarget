@@ -1,4 +1,4 @@
-//===-RTLs/generic-64bit/src/rtl.cpp - Target RTLs Implementation - C++ -*-===//
+//===- RTLs/cloud/src/rtl.cpp - Target RTLs Implementation -------- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RTL for generic 64-bit machine
+// RTL for Apache Spark cloud cluster
 //
 //===----------------------------------------------------------------------===//
 
@@ -33,16 +33,13 @@
 #define GETNAME(name) GETNAME2(name)
 #define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL",__VA_ARGS__)
 
-#define NUMBER_OF_DEVICES 4
-
-struct cloud_hdfs_t{
+struct HdfsInfo{
   char *ServAddress;
   int ServPort;
   char *UserName;
-  void *Node;
 };
 
-struct cloud_spark_t {
+struct SparkInfo{
   char *Name;
   char *Url;
   int Port;
@@ -59,6 +56,12 @@ class RTLDeviceInfoTy{
   std::vector<FuncOrGblEntryTy> FuncGblEntries;
 
 public:
+  int NumberOfDevices;
+
+  std::vector<HdfsInfo> HdfsClusters;
+  std::vector<SparkInfo> SparkClusters;
+
+  std::vector<hdfsFS> HdfsNodes;
 
   // Record entry point associated with device
   void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin, __tgt_offload_entry *end){
@@ -93,90 +96,40 @@ public:
     return &E.Table;
   }
 
-  RTLDeviceInfoTy(int32_t num_devices){
-    FuncGblEntries.resize(num_devices);
+  RTLDeviceInfoTy(){
+    NumberOfDevices = 0;
+
+    // TODO: Detect the number of clouds available
+
+    FuncGblEntries.resize(NumberOfDevices);
+    HdfsClusters.resize(NumberOfDevices);
+    SparkClusters.resize(NumberOfDevices);
   }
 
   ~RTLDeviceInfoTy(){
-    // Close dynamic libraries
-
+    // Disconnecting clouds
+    for(int i=0; i<HdfsNodes.size(); i++) {
+      if(HdfsNodes[i]) {
+        int err = hdfsDisconnect(HdfsNodes[i]);
+        if (err != -1) {
+          DP ("Error when disconnecting HDFS server\n");
+        }
+      }
+    }
   }
+
 };
 
-static RTLDeviceInfoTy DeviceInfo(NUMBER_OF_DEVICES);
+static RTLDeviceInfoTy DeviceInfo;
 
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-cloud_hdfs_t* _cloud_hdfs_init(char *servAddress, int servPort, char* userName) {
-  cloud_hdfs_t *hdfs = (cloud_hdfs_t*) malloc(sizeof(cloud_hdfs_t));
-  hdfs->ServAddress = servAddress;
-  hdfs->ServPort = servPort;
-  hdfs->UserName = userName;
-  return hdfs;
-}
 
-int _cloud_hdfs_connect(cloud_hdfs_t *cloud) {
-  struct hdfsBuilder *builder = hdfsNewBuilder();
-  hdfsBuilderSetNameNode(builder, cloud->ServAddress);
-  hdfsBuilderSetNameNodePort(builder, cloud->ServPort);
-  hdfsBuilderSetUserName(builder, cloud->UserName);
-  cloud->Node = hdfsBuilderConnect(builder);
-  hdfsFreeBuilder(builder);
-  return 0;
-}
 
-int _cloud_hdfs_disconnect(cloud_hdfs_t *cloud) {
-  hdfsFS fs = (hdfsFS) cloud->Node;
-  return hdfsDisconnect(fs);
-}
-
-int _cloud_hdfs_send(cloud_hdfs_t *cloud, char *id, void *buffer, int bufSize) {
-  hdfsFS fs = (hdfsFS) cloud->Node;
-  hdfsFile file = hdfsOpenFile(fs, id, O_WRONLY, 0, 0, 0);
-
-  int retval = hdfsWrite(fs, file, buffer, bufSize);
-  retval = hdfsCloseFile(fs, file);
-  return 0;
-}
-
-int _cloud_hdfs_send_int(cloud_hdfs_t *cloud, char *id, int *buffer, int bufSize) {
-  hdfsFS fs = (hdfsFS) cloud->Node;
-  hdfsFile file = hdfsOpenFile(fs, id, O_WRONLY, 0, 0, 0);
-  int i;
-  int retval;
-  for(i=0; i<bufSize; i++) {
-    char str[10] = "";
-    sprintf(str, "%*d ", 8, buffer[i]);
-    retval = hdfsWrite(fs, file, str, 10*sizeof(char));
-
-    //hdfsFlush(fs, file);
-  }
-
-  retval = hdfsCloseFile(fs, file);
-  return 0;
-}
-
-int _cloud_hdfs_receive(cloud_hdfs_t *cloud, char *id, void *buffer, int bufSize) {
-  hdfsFS fs = (hdfsFS) cloud->Node;
-  hdfsFile file = hdfsOpenFile(fs, id, O_RDONLY, 0, 0, 0);
-  int retval = hdfsRead(fs, file, buffer, bufSize);
-  retval = hdfsCloseFile(fs, file);
-  return 0;
-}
-
-cloud_spark_t* _cloud_spark_init(char *adress, int port) {
-  cloud_spark_t *spark = (cloud_spark_t*) malloc(sizeof(cloud_spark_t));
-  return spark;
-}
-
-int _cloud_spark_connect(cloud_spark_t *cloud) {
-  return 0;
-}
-
-int _cloud_spark_create_program(cloud_hdfs_t *cloud) {
+int _cloud_spark_create_program() {
   // 1/ Generate scala code (with template)
   // 2/ Compile in jar -> system("sbt package");
   // 3/ Generate native kernel code (map function)
@@ -185,7 +138,7 @@ int _cloud_spark_create_program(cloud_hdfs_t *cloud) {
   return 0;
 }
 
-int _cloud_spark_launch(cloud_spark_t *cloud) {
+int _cloud_spark_launch() {
   //system("spark-submit --class test.dummy.HdfsTest /Users/hyviquel/tmp/test/target/scala-2.11/test_2.11-0.1.0.jar");
   system("spark-submit --class test.dummy.FullTest /Users/hyviquel/tmp/test/target/scala-2.11/test_2.11-0.1.0.jar");
   return 0;
@@ -193,20 +146,29 @@ int _cloud_spark_launch(cloud_spark_t *cloud) {
 
 int __tgt_rtl_device_type(int32_t device_id){
 
-  if( device_id < NUMBER_OF_DEVICES)
-    return 21; // EM_PPC64
-
   return 0;
 }
 
 int __tgt_rtl_number_of_devices(){
-  return NUMBER_OF_DEVICES;
+  return DeviceInfo.NumberOfDevices;
 }
 
 int32_t __tgt_rtl_init_device(int32_t device_id){
-  // TODO: init connection to HDFS and Spark servers
-  _cloud_hdfs_init(NULL, 0, NULL);
-  _cloud_spark_init(NULL, 0);
+  DP ("Getting device %d\n", device_id);
+
+  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
+  SparkInfo spark = DeviceInfo.SparkClusters[device_id];
+
+  // Init connection to HDFS cluster
+  struct hdfsBuilder *builder = hdfsNewBuilder();
+  hdfsBuilderSetNameNode(builder, hdfs.ServAddress);
+  hdfsBuilderSetNameNodePort(builder, hdfs.ServPort);
+  hdfsBuilderSetUserName(builder, hdfs.UserName);
+  DeviceInfo.HdfsNodes[device_id] = hdfsBuilderConnect(builder);
+  hdfsFreeBuilder(builder);
+
+  // TODO: Init connection to Apache Spark cluster
+
   return OFFLOAD_SUCCESS; // success
 }
 
@@ -215,7 +177,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   DP("Dev %d: load binary from 0x%llx image\n", device_id,
       (long long)image->ImageStart);
 
-  assert(device_id>=0 && device_id<NUMBER_OF_DEVICES && "bad dev id");
+  assert(device_id>=0 && device_id<DeviceInfo.NumberOfDevices && "bad dev id");
 
   size_t ImageSize = (size_t)image->ImageEnd - (size_t)image->ImageStart;
   size_t NumEntries = (size_t) (image->EntriesEnd - image->EntriesBegin);
@@ -232,17 +194,26 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size){
 }
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, int64_t size){
-  // TODO: write into HDFS file
+  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
+  hdfsFile file = hdfsOpenFile(fs, "", O_WRONLY, 0, 0, 0);
+  int retval = hdfsWrite(fs, file, hst_ptr, size);
+  retval = hdfsCloseFile(fs, file);
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr, int64_t size){
-  // TODO: read from HDFS file
+  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
+  hdfsFile file = hdfsOpenFile(fs, "id", O_RDONLY, 0, 0, 0);
+  int retval = hdfsRead(fs, file, hst_ptr, size);
+  retval = hdfsCloseFile(fs, file);
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr){
   // TODO: remove HDFS file
+  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
+  hdfsFile file = hdfsOpenFile(fs, "", O_WRONLY, 0, 0, 0);
+  hdfsDelete(fs, "", 0);
   return OFFLOAD_SUCCESS;
 }
 
