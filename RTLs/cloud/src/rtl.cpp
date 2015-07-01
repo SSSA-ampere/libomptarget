@@ -11,15 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <algorithm>
 #include <assert.h>
-#include <cstdio>
-#include <dlfcn.h>
-#include <gelf.h>
-#include <list>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <vector>
 #include <hdfs.h>
 
