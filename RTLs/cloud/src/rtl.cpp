@@ -131,6 +131,7 @@ int _cloud_spark_create_program() {
 }
 
 int _cloud_spark_launch() {
+  // FIXME: hardcoded execution
   //system("spark-submit --class test.dummy.HdfsTest /Users/hyviquel/tmp/test/target/scala-2.11/test_2.11-0.1.0.jar");
   system("spark-submit --class test.dummy.FullTest /Users/hyviquel/tmp/test/target/scala-2.11/test_2.11-0.1.0.jar");
   return 0;
@@ -166,14 +167,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
 
 __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image *image){
 
-  DP("Dev %d: load binary from 0x%llx image\n", device_id,
-      (long long)image->ImageStart);
-
-  assert(device_id>=0 && device_id<DeviceInfo.NumberOfDevices && "bad dev id");
-
-  size_t ImageSize = (size_t)image->ImageEnd - (size_t)image->ImageStart;
-  size_t NumEntries = (size_t) (image->EntriesEnd - image->EntriesBegin);
-  DP("Expecting to have %ld entries defined.\n", (long)NumEntries);
+  DP("Not loading binary\n");
 
   // TODO
 
@@ -212,18 +206,8 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr){
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
    void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit)
 {
-  // ignore team num and thread limit
-
-
-
-  // All args are references
-
-  std::vector<void*> args(arg_num);
-
-  for(int32_t i=0; i<arg_num; ++i)
-    args[i] = &tgt_args[i];
-
-  void (*fptr)(void*) = (void (*)(void*))tgt_entry_ptr;
+  // run hardcoded spark kernel
+  _cloud_spark_launch();
 
   DP("Running entry point at %016lx...\n",(Elf64_Addr)tgt_entry_ptr);
 
