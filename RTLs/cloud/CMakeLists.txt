@@ -24,7 +24,7 @@ if(TRUE)
 
     include_directories(${HDFS3_INCLUDE_DIR})
 
-    add_library(omptarget.rtl.cloud src/rtl.cpp)
+    add_library(omptarget.rtl.cloud SHARED src/rtl.cpp)
     target_link_libraries(omptarget.rtl.cloud)
 
 else()
