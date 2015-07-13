@@ -177,7 +177,8 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
     GElf_Shdr hdr;
     gelf_getshdr(section, &hdr);
 
-    if (!strcmp(elf_strptr(e,shstrndx,hdr.sh_name),".openmptgt_host_entries")){
+//    if (!strcmp(elf_strptr(e,shstrndx,hdr.sh_name),".openmptgt_host_entries")){
+    if (!strcmp(elf_strptr(e,shstrndx,hdr.sh_name),".omptgt_hst_entr")){
       entries_offset = hdr.sh_addr;
       break;
     }
@@ -302,11 +303,11 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   return OFFLOAD_SUCCESS;
 }
 
-int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr, 
+int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
   void **tgt_args, int32_t arg_num)
 {
   // use one team and one thread
-  return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr, 
+  return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr,
     tgt_args, arg_num, 1, 1);
 }
 
