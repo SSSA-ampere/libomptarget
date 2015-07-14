@@ -119,7 +119,7 @@ public:
     for(int i=0; i<HdfsNodes.size(); i++) {
       if(HdfsNodes[i]) {
         int err = hdfsDisconnect(HdfsNodes[i]);
-        if (err != -1) {
+        if (err != 0) {
           DP ("Error when disconnecting HDFS server\n");
         }
       }

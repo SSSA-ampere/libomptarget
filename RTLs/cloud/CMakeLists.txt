@@ -15,7 +15,7 @@
 
 find_package(HDFS3 QUIET)
 
-if(LIBHDFS3_FOUND)
+if(HDFS3_FOUND)
 
     message("Building cloud target RTL")
 
