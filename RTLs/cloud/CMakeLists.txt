@@ -11,16 +11,13 @@
 #
 ##===----------------------------------------------------------------------===##
 
-set(tmachine "x86_64")
-set(tmachine_name "x86_64")
-set(tmachine_libname "x86_64")
 
 
-if(TRUE)
+find_package(HDFS3 QUIET)
+
+if(LIBHDFS3_FOUND)
 
     message("Building cloud target RTL")
-
-    find_package(HDFS3 REQUIRED)
 
     include_directories(${HDFS3_INCLUDE_DIR})
 
@@ -29,6 +26,6 @@ if(TRUE)
 
 else()
 
-    message("Cloud infrastructure not found in system: not building cloud RTL")
+    message("LibHDFS3 not found in system: not building cloud RTL")
 
 endif()
