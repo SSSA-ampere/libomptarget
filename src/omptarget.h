@@ -112,6 +112,7 @@ int __tgt_target_teams(int32_t device_id, void *host_ptr, int32_t arg_num,
 #endif
 
 #ifdef OMPTARGET_DEBUG
+#include <stdio.h>
 # define DEBUGP(prefix, ...) { fprintf(stderr, "%s --> ", prefix); \
                              fprintf(stderr, __VA_ARGS__); }
 #else

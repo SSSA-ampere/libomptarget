@@ -1,10 +1,10 @@
 ##===----------------------------------------------------------------------===##
-# 
+#
 #                     The LLVM Compiler Infrastructure
 #
 # This file is distributed under the University of Illinois Open Source
 # License. See LICENSE.TXT for details.
-# 
+#
 ##===----------------------------------------------------------------------===##
 #
 # Build an RTL for a x86_64 machine if available
@@ -22,7 +22,9 @@ if(LIBHDFS3_FOUND)
     include_directories(${HDFS3_INCLUDE_DIR})
 
     add_library(omptarget.rtl.cloud SHARED src/rtl.cpp)
-    target_link_libraries(omptarget.rtl.cloud ${HDFS3_LIBRARY})
+    target_link_libraries(omptarget.rtl.cloud ${HDFS3_LIBRARY}
+      ${LIBFFI_LIBRARIES} ${LIBELF_LIBRARIES}
+    )
 
 else()
 
