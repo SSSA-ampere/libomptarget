@@ -13,6 +13,7 @@
 
 #include <assert.h>
 #include <vector>
+#include <unordered_map>
 #include <hdfs.h>
 
 #include <dlfcn.h>
@@ -71,6 +72,11 @@ public:
   std::vector<SparkInfo> SparkClusters;
 
   std::vector<hdfsFS> HdfsNodes;
+  // TODO: I believe the best way would be for HdfsAddresses to be an unordered_map as
+  // well. That way, we can map each hdfsFS to their corresponding addresses
+  // table. However, that would require hdfsFS to be hasheable - see documentation
+  // on unordered_map to know more
+  std::vector<std::unordered_map<uintptr_t, std::string>> HdfsAddresses;
 
   // Record entry point associated with device
   void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin, __tgt_offload_entry *end){
@@ -112,6 +118,7 @@ public:
     HdfsClusters.resize(NumberOfDevices);
     SparkClusters.resize(NumberOfDevices);
     HdfsNodes.resize(NumberOfDevices);
+    HdfsAddresses.resize(NumberOfDevices);
   }
 
   ~RTLDeviceInfoTy(){
@@ -124,6 +131,8 @@ public:
         }
       }
     }
+
+    // TODO: clear map of addresses
   }
 
 };
@@ -146,7 +155,47 @@ int _cloud_spark_create_program() {
   return 0;
 }
 
-int _cloud_spark_launch() {
+int _cloud_spark_launch(int device_id) {
+  // Before launching, write address table in special file which will be read by
+  // the scala kernel
+  // TODO: create a function to create a file and write data to it
+  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
+
+  hdfsFile file = hdfsOpenFile(fs, "/user/bernardo/cloud_test/__address_table", O_WRONLY, 0, 0, 0);
+
+  if (file == NULL) {
+    DP("Couldn't create address table file!\n");
+    return -1;
+  }
+
+  std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
+  int retval = 0;
+
+  for (auto &itr : currmapping) {
+    retval = hdfsWrite(fs, file, &(itr.first), sizeof(uintptr_t));
+
+    if (retval == -1) {
+      break;
+    }
+
+    retval = hdfsWrite(fs, file, itr.second.c_str(), itr.second.length() + 1);
+
+    if (retval == -1) {
+      break;
+    }
+  }
+
+  if (retval != -1) {
+    retval = hdfsCloseFile(fs, file);
+  }
+
+  if (retval == -1) {
+    DP("Error when creating address table in HDFS.\n");
+    return -1;
+  }
+
+  DP("Wrote address table in HDFS.\n");
+
   // FIXME: hardcoded execution
   FILE *fp;
 
@@ -194,8 +243,9 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   hdfsBuilderSetNameNode(builder, "localhost");
   hdfsBuilderSetNameNodePort(builder, 9000);
   hdfsBuilderSetUserName(builder, "bernardo");
-  DeviceInfo.HdfsNodes[device_id] = hdfsBuilderConnect(builder);
+  hdfsFS connection = hdfsBuilderConnect(builder);
   hdfsFreeBuilder(builder);
+  DeviceInfo.HdfsNodes[device_id] = connection;
 
   // TODO: Init connection to Apache Spark cluster
 
@@ -321,30 +371,64 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
 }
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size){
-  // TODO: create HDFS file
-  return (void *)0x30303030;
+  // NOTE: we do not create the HDFS file here because we do not want to
+  // waste time creating stuff that we might not need before (there may be
+  // unecessary allocations)
+  std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
+
+  // TODO: there's certainly a better way to do this
+  uintptr_t highest = 0;
+  for (auto &itr : currmapping) {
+    if (itr.first > highest) {
+      highest = itr.first;
+    }
+  }
+
+  highest += 1;
+
+  // TODO: something to do with the size too?
+
+  // TODO: get basename from hdfs address or from local configuration from user
+  std::string filename = "/user/bernardo/cloud_test/" + std::to_string(highest);
+  currmapping.emplace(highest, filename);
+
+  return (void *)highest;
 }
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, int64_t size){
-  if (size < 100) {
-    return OFFLOAD_SUCCESS;
-  }
-
+  // Since we now need the hdfs file, we create it here
   DP("Submitting data for device %d\n", device_id);
 
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-  hdfsFile file = hdfsOpenFile(fs, "/user/bernardo/cloud_test/A", O_WRONLY, 0, 0, 0);
+  std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
+  uintptr_t targetaddr = (uintptr_t)tgt_ptr;
+  std::string filename = currmapping[targetaddr];
+
+  DP("Creating file '%s'\n", filename.c_str());
+
+  hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
   int retval = hdfsWrite(fs, file, hst_ptr, size);
-  retval = hdfsCloseFile(fs, file);
-  return OFFLOAD_SUCCESS;
+  if (retval != -1) {
+    retval = hdfsCloseFile(fs, file);
+  }
+
+  return retval != -1 ? OFFLOAD_SUCCESS : OFFLOAD_FAIL;
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr, int64_t size){
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-  hdfsFile file = hdfsOpenFile(fs, "/user/bernardo/cloud_test/sum", O_RDONLY, 0, 0, 0);
+  std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
+  uintptr_t targetaddr = (uintptr_t)tgt_ptr;
+  std::string filename = currmapping[targetaddr];
+
+  DP("Reading file '%s'\n", filename.c_str());
+
+  hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_RDONLY, 0, 0, 0);
   int retval = hdfsRead(fs, file, hst_ptr, size);
-  retval = hdfsCloseFile(fs, file);
-  return OFFLOAD_SUCCESS;
+  if (retval != -1) {
+    retval = hdfsCloseFile(fs, file);
+  }
+  return retval != -1 ? OFFLOAD_SUCCESS : OFFLOAD_FAIL;
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr){
@@ -359,7 +443,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
    void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit)
 {
   // run hardcoded spark kernel
-  _cloud_spark_launch();
+  _cloud_spark_launch(device_id);
 
   return OFFLOAD_SUCCESS;
 }
