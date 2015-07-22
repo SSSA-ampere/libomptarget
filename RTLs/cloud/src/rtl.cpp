@@ -54,6 +54,9 @@ struct SparkInfo{
   int Port;
 };
 
+//HdfsInfo testHdfs = {"10.0.2.2", 9000, "hyviquel"};
+HdfsInfo testHdfs = {"localhost", 9000, "bernardo"};
+
 
 /// Keep entries table per device
 struct FuncOrGblEntryTy{
@@ -239,9 +242,9 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   //hdfsBuilderSetNameNode(builder, hdfs.ServAddress);
   //hdfsBuilderSetNameNodePort(builder, hdfs.ServPort);
   //hdfsBuilderSetUserName(builder, hdfs.UserName);
-  hdfsBuilderSetNameNode(builder, "localhost");
-  hdfsBuilderSetNameNodePort(builder, 9000);
-  hdfsBuilderSetUserName(builder, "bernardo");
+  hdfsBuilderSetNameNode(builder, testHdfs.ServAddress);
+  hdfsBuilderSetNameNodePort(builder, testHdfs.ServPort);
+  hdfsBuilderSetUserName(builder, testHdfs.UserName);
   hdfsFS connection = hdfsBuilderConnect(builder);
   hdfsFreeBuilder(builder);
   DeviceInfo.HdfsNodes[device_id] = connection;
