@@ -198,7 +198,7 @@ int _cloud_spark_launch(int device_id) {
   // FIXME: hardcoded execution
   FILE *fp;
 
-  fp = popen("/home/bernardo/projects/spark-1.4.0-bin-hadoop2.6/bin/spark-submit --class test.dummy.HdfsTest /home/bernardo/projects/cloud_test/test/target/scala-2.10/test_2.10-0.1.0.jar", "r");
+  fp = popen("spark-submit --class test.dummy.HdfsTest /home/bernardo/projects/cloud_test/test/target/scala-2.10/test_2.10-0.1.0.jar", "r");
 
   if (fp == NULL) {
       DP("Failed to start spark job.\n");
