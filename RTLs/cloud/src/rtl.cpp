@@ -18,7 +18,6 @@
 
 #include <dlfcn.h>
 #include <elf.h>
-#include <ffi.h>
 #include <gelf.h>
 #include <string.h>
 #include <link.h>

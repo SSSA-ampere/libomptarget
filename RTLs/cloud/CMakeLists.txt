@@ -23,7 +23,7 @@ if(HDFS3_FOUND)
 
     add_library(omptarget.rtl.cloud SHARED src/rtl.cpp)
     target_link_libraries(omptarget.rtl.cloud ${HDFS3_LIBRARY}
-      ${LIBFFI_LIBRARIES} ${LIBELF_LIBRARIES}
+      ${LIBELF_LIBRARIES}
     )
 
 else()
