@@ -246,6 +246,10 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   hdfsBuilderSetNameNodePort(builder, testHdfs.ServPort);
   hdfsBuilderSetUserName(builder, testHdfs.UserName);
   hdfsFS connection = hdfsBuilderConnect(builder);
+  if(connection == NULL) {
+    return OFFLOAD_FAIL;
+  }
+
   hdfsFreeBuilder(builder);
   DeviceInfo.HdfsNodes[device_id] = connection;
 
