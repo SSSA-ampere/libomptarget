@@ -157,71 +157,6 @@ int _cloud_spark_create_program() {
   return 0;
 }
 
-int _cloud_spark_launch(int device_id) {
-  // Before launching, write address table in special file which will be read by
-  // the scala kernel
-  // TODO: create a function to create a file and write data to it
-  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-
-  hdfsFile file = hdfsOpenFile(fs, "/user/bernardo/cloud_test/__address_table", O_WRONLY, 0, 0, 0);
-
-  if (file == NULL) {
-    DP("Couldn't create address table file!\n");
-    return -1;
-  }
-
-  std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
-  int retval = 0;
-
-  for (auto &itr : currmapping) {
-    retval = hdfsWrite(fs, file, &(itr.first), sizeof(uintptr_t));
-
-    if (retval == -1) {
-      break;
-    }
-
-    retval = hdfsWrite(fs, file, itr.second.c_str(), itr.second.length() + 1);
-
-    if (retval == -1) {
-      break;
-    }
-  }
-
-  if (retval != -1) {
-    retval = hdfsCloseFile(fs, file);
-  }
-
-  if (retval == -1) {
-    DP("Error when creating address table in HDFS.\n");
-    return -1;
-  }
-
-  DP("Wrote address table in HDFS.\n");
-
-  // FIXME: hardcoded execution
-  FILE *fp;
-
-  fp = popen("spark-submit --class test.dummy.HdfsTest /home/bernardo/projects/cloud_test/test/target/scala-2.10/test_2.10-0.1.0.jar", "r");
-
-  if (fp == NULL) {
-      DP("Failed to start spark job.\n");
-      return 1;
-  }
-
-  char buf[512] = {0};
-  uint read = 0;
-
-  while ((read = fread(buf, sizeof(char), 511, fp)) == 512) {
-    buf[511] = 0;
-    printf("    %s", buf);
-  }
-
-  buf[read] = 0;
-  printf("    %s", buf);
-
-  return 0;
-}
-
 int __tgt_rtl_device_type(int32_t device_id){
 
   return 0;
@@ -449,7 +384,66 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
    void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit)
 {
   // run hardcoded spark kernel
-  _cloud_spark_launch(device_id);
+  // Before launching, write address table in special file which will be read by
+  // the scala kernel
+  // TODO: create a function to create a file and write data to it
+  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
+
+  hdfsFile file = hdfsOpenFile(fs, "/user/bernardo/cloud_test/__address_table", O_WRONLY, 0, 0, 0);
+
+  if (file == NULL) {
+    DP("Couldn't create address table file!\n");
+    return OFFLOAD_FAIL;
+  }
+
+  std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
+  int retval = 0;
+
+  for (auto &itr : currmapping) {
+    retval = hdfsWrite(fs, file, &(itr.first), sizeof(uintptr_t));
+
+    if (retval == -1) {
+      break;
+    }
+
+    retval = hdfsWrite(fs, file, itr.second.c_str(), itr.second.length() + 1);
+
+    if (retval == -1) {
+      break;
+    }
+  }
+
+  if (retval != -1) {
+    retval = hdfsCloseFile(fs, file);
+  }
+
+  if (retval == -1) {
+    DP("Error when creating address table in HDFS.\n");
+    return OFFLOAD_FAIL;
+  }
+
+  DP("Wrote address table in HDFS.\n");
+
+  // FIXME: hardcoded execution
+  FILE *fp;
+
+  fp = popen("spark-submit --class test.dummy.HdfsTest /home/bernardo/projects/cloud_test/test/target/scala-2.10/test_2.10-0.1.0.jar", "r");
+
+  if (fp == NULL) {
+      DP("Failed to start spark job.\n");
+      return OFFLOAD_FAIL;
+  }
+
+  char buf[512] = {0};
+  uint read = 0;
+
+  while ((read = fread(buf, sizeof(char), 511, fp)) == 512) {
+    buf[511] = 0;
+    printf("    %s", buf);
+  }
+
+  buf[read] = 0;
+  printf("    %s", buf);
 
   return OFFLOAD_SUCCESS;
 }
