@@ -54,14 +54,22 @@ struct SparkInfo{
   int Port;
 };
 
+struct JobInfo{
+  std::string package;
+  std::string jarPath;
+};
+
 
 // Configuration variables
 
 HdfsInfo testHdfs = {"10.0.2.2", 9000, "hyviquel"};
 std::string workingDir = "/user/hyviquel/cloud_test/";
+JobInfo sparkJob = {"test.dummy.HdfsTest",  "/home/hyviquel/Workspace/cloud-offload-test/test/target/scala-2.10/test_2.10-0.1.0.jar"};
 
 //HdfsInfo testHdfs = {"localhost", 9000, "bernardo"};
 //std::string workingDir = "/user/bernardo/cloud_test/";
+//JobInfo sparkJob = {"test.dummy.HdfsTest",  "/home/bernardo/projects/cloud_test/test/target/scala-2.10/test_2.10-0.1.0.jar"};
+
 
 
 
@@ -464,9 +472,8 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   DP("Wrote address table in HDFS.\n");
 
   // FIXME: hardcoded execution
-  FILE *fp;
-
-  fp = popen("spark-submit --class test.dummy.HdfsTest /home/bernardo/projects/cloud_test/test/target/scala-2.10/test_2.10-0.1.0.jar", "r");
+  std::string cmd = "spark-submit --class " + sparkJob.package + " " + sparkJob.jarPath;
+  FILE *fp = popen(cmd.c_str(), "r");
 
   if (fp == NULL) {
       DP("Failed to start spark job.\n");
