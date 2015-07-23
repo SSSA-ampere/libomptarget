@@ -348,12 +348,24 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, i
   DP("Creating file '%s'\n", filename.c_str());
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
-  int retval = hdfsWrite(fs, file, hst_ptr, size);
-  if (retval != -1) {
-    retval = hdfsCloseFile(fs, file);
+  if(file == NULL) {
+    DP("%s", hdfsGetLastError());
+    return OFFLOAD_FAIL;
   }
 
-  return retval != -1 ? OFFLOAD_SUCCESS : OFFLOAD_FAIL;
+  int retval = hdfsWrite(fs, file, hst_ptr, size);
+  if(retval < 0) {
+    DP("%s", hdfsGetLastError());
+    return OFFLOAD_FAIL;
+  }
+
+  retval = hdfsCloseFile(fs, file);
+  if(retval < 0) {
+    DP("%s", hdfsGetLastError());
+    return OFFLOAD_FAIL;
+  }
+
+  return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr, int64_t size){
@@ -365,11 +377,24 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
   DP("Reading file '%s'\n", filename.c_str());
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_RDONLY, 0, 0, 0);
-  int retval = hdfsRead(fs, file, hst_ptr, size);
-  if (retval != -1) {
-    retval = hdfsCloseFile(fs, file);
+  if(file == NULL) {
+    DP("%s", hdfsGetLastError());
+    return OFFLOAD_FAIL;
   }
-  return retval != -1 ? OFFLOAD_SUCCESS : OFFLOAD_FAIL;
+
+  int retval = hdfsRead(fs, file, hst_ptr, size);
+  if(retval < 0) {
+    DP("%s", hdfsGetLastError());
+    return OFFLOAD_FAIL;
+  }
+
+  retval = hdfsCloseFile(fs, file);
+  if(retval < 0) {
+    DP("%s", hdfsGetLastError());
+    return OFFLOAD_FAIL;
+  }
+
+  return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr){
@@ -401,24 +426,22 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 
   for (auto &itr : currmapping) {
     retval = hdfsWrite(fs, file, &(itr.first), sizeof(uintptr_t));
-
-    if (retval == -1) {
-      break;
+    if(retval < 0) {
+      DP("%s", hdfsGetLastError());
+      return OFFLOAD_FAIL;
     }
 
     retval = hdfsWrite(fs, file, itr.second.c_str(), itr.second.length() + 1);
-
-    if (retval == -1) {
-      break;
+    if(retval < 0) {
+      DP("%s", hdfsGetLastError());
+      return OFFLOAD_FAIL;
     }
   }
 
-  if (retval != -1) {
-    retval = hdfsCloseFile(fs, file);
-  }
-
-  if (retval == -1) {
+  retval = hdfsCloseFile(fs, file);
+  if(retval < 0) {
     DP("Error when creating address table in HDFS.\n");
+    DP("%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
