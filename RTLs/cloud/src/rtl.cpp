@@ -54,8 +54,15 @@ struct SparkInfo{
   int Port;
 };
 
-//HdfsInfo testHdfs = {"10.0.2.2", 9000, "hyviquel"};
-HdfsInfo testHdfs = {"localhost", 9000, "bernardo"};
+
+// Configuration variables
+
+HdfsInfo testHdfs = {"10.0.2.2", 9000, "hyviquel"};
+std::string workingDir = "/user/hyviquel/cloud_test/";
+
+//HdfsInfo testHdfs = {"localhost", 9000, "bernardo"};
+//std::string workingDir = "/user/bernardo/cloud_test/";
+
 
 
 /// Keep entries table per device
@@ -180,15 +187,23 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   hdfsBuilderSetNameNode(builder, testHdfs.ServAddress);
   hdfsBuilderSetNameNodePort(builder, testHdfs.ServPort);
   hdfsBuilderSetUserName(builder, testHdfs.UserName);
-  hdfsFS connection = hdfsBuilderConnect(builder);
-  if(connection == NULL) {
+  hdfsFS fs = hdfsBuilderConnect(builder);
+  if(fs == NULL) {
     return OFFLOAD_FAIL;
   }
 
   hdfsFreeBuilder(builder);
-  DeviceInfo.HdfsNodes[device_id] = connection;
+  DeviceInfo.HdfsNodes[device_id] = fs;
 
   // TODO: Init connection to Apache Spark cluster
+
+  if(hdfsExists(fs, workingDir.c_str()) < 0) {
+    retval = hdfsCreateDirectory(fs, workingDir.c_str());
+    if(retval < 0) {
+      DP("%s", hdfsGetLastError());
+      return OFFLOAD_FAIL;
+    }
+  }
 
   return OFFLOAD_SUCCESS; // success
 }
@@ -330,7 +345,7 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size){
   // TODO: something to do with the size too?
 
   // TODO: get basename from hdfs address or from local configuration from user
-  std::string filename = "/user/bernardo/cloud_test/" + std::to_string(highest);
+  std::string filename = workingDir + std::to_string(highest);
   currmapping.emplace(highest, filename);
 
   return (void *)highest;
@@ -408,21 +423,22 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr){
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
    void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit)
 {
+  int retval = 0;
+
   // run hardcoded spark kernel
   // Before launching, write address table in special file which will be read by
   // the scala kernel
   // TODO: create a function to create a file and write data to it
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
 
-  hdfsFile file = hdfsOpenFile(fs, "/user/bernardo/cloud_test/__address_table", O_WRONLY, 0, 0, 0);
-
+  hdfsFile file = hdfsOpenFile(fs, (workingDir + "address_table").c_str(), O_WRONLY, 0, 0, 0);
   if (file == NULL) {
     DP("Couldn't create address table file!\n");
     return OFFLOAD_FAIL;
   }
 
   std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
-  int retval = 0;
+
 
   for (auto &itr : currmapping) {
     retval = hdfsWrite(fs, file, &(itr.first), sizeof(uintptr_t));
