@@ -182,6 +182,8 @@ int __tgt_rtl_number_of_devices(){
 }
 
 int32_t __tgt_rtl_init_device(int32_t device_id){
+  int retval;
+
   DP ("Getting device %d\n", device_id);
 
   //dfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
@@ -368,23 +370,23 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, i
   uintptr_t targetaddr = (uintptr_t)tgt_ptr;
   std::string filename = currmapping[targetaddr];
 
-  DP("Creating file '%s'\n", filename.c_str());
+  DP("Writing data in file '%s'\n", filename.c_str());
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
   if(file == NULL) {
-    DP("%s", hdfsGetLastError());
+    DP("Opening failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
   int retval = hdfsWrite(fs, file, hst_ptr, size);
   if(retval < 0) {
-    DP("%s", hdfsGetLastError());
+    DP("Writing failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
   retval = hdfsCloseFile(fs, file);
   if(retval < 0) {
-    DP("%s", hdfsGetLastError());
+    DP("Closing failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
@@ -397,23 +399,23 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
   uintptr_t targetaddr = (uintptr_t)tgt_ptr;
   std::string filename = currmapping[targetaddr];
 
-  DP("Reading file '%s'\n", filename.c_str());
+  DP("Reading data from file '%s'\n", filename.c_str());
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_RDONLY, 0, 0, 0);
   if(file == NULL) {
-    DP("%s", hdfsGetLastError());
+    DP("Opening failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
   int retval = hdfsRead(fs, file, hst_ptr, size);
   if(retval < 0) {
-    DP("%s", hdfsGetLastError());
+    DP("Reading failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
   retval = hdfsCloseFile(fs, file);
   if(retval < 0) {
-    DP("%s", hdfsGetLastError());
+    DP("Closing failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
@@ -439,9 +441,11 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   // TODO: create a function to create a file and write data to it
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
 
-  hdfsFile file = hdfsOpenFile(fs, (workingDir + "address_table").c_str(), O_WRONLY, 0, 0, 0);
+  std::string addressFile = (workingDir + "__address_table");
+
+  hdfsFile file = hdfsOpenFile(fs, addressFile.c_str(), O_WRONLY, 0, 0, 0);
   if (file == NULL) {
-    DP("Couldn't create address table file!\n");
+    DP("Couldn't create address table file!\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
@@ -451,21 +455,20 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   for (auto &itr : currmapping) {
     retval = hdfsWrite(fs, file, &(itr.first), sizeof(uintptr_t));
     if(retval < 0) {
-      DP("%s", hdfsGetLastError());
+      DP("Couldn't write address table!\n%s", hdfsGetLastError());
       return OFFLOAD_FAIL;
     }
 
     retval = hdfsWrite(fs, file, itr.second.c_str(), itr.second.length() + 1);
     if(retval < 0) {
-      DP("%s", hdfsGetLastError());
+      DP("Couldn't write address table!\n%s", hdfsGetLastError());
       return OFFLOAD_FAIL;
     }
   }
 
   retval = hdfsCloseFile(fs, file);
   if(retval < 0) {
-    DP("Error when creating address table in HDFS.\n");
-    DP("%s", hdfsGetLastError());
+    DP("Error when creating address table in HDFS.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
@@ -476,8 +479,8 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   FILE *fp = popen(cmd.c_str(), "r");
 
   if (fp == NULL) {
-      DP("Failed to start spark job.\n");
-      return OFFLOAD_FAIL;
+    DP("Failed to start spark job.\n");
+    return OFFLOAD_FAIL;
   }
 
   char buf[512] = {0};
