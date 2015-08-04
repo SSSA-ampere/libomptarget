@@ -20,8 +20,9 @@ if(HDFS3_FOUND)
     message("Building cloud target RTL")
 
     include_directories(${HDFS3_INCLUDE_DIR})
+    include_directories(src)
 
-    add_library(omptarget.rtl.cloud SHARED src/rtl.cpp)
+    add_library(omptarget.rtl.cloud SHARED src/rtl.cpp src/INIReader.cpp ini.c)
     target_link_libraries(omptarget.rtl.cloud ${HDFS3_LIBRARY}
       ${LIBELF_LIBRARIES}
     )

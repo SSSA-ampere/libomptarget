@@ -25,6 +25,7 @@
 #include <stdlib.h>
 
 #include "omptarget.h"
+#include "INIReader.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
@@ -43,9 +44,10 @@ struct DynLibTy{
 #define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL",__VA_ARGS__)
 
 struct HdfsInfo{
-  char *ServAddress;
+  std::string ServAddress;
   int ServPort;
-  char *UserName;
+  std::string UserName;
+  std::string WorkingDir;
 };
 
 struct SparkInfo{
@@ -55,20 +57,14 @@ struct SparkInfo{
 };
 
 struct JobInfo{
-  std::string package;
-  std::string jarPath;
+  std::string Package;
+  std::string JarPath;
 };
 
 
 // Configuration variables
-
-HdfsInfo testHdfs = {"10.0.2.2", 9000, "hyviquel"};
-std::string workingDir = "/user/hyviquel/cloud_test/";
-JobInfo sparkJob = {"test.dummy.HdfsTest",  "/home/hyviquel/Workspace/cloud-offload-test/test/target/scala-2.10/test_2.10-0.1.0.jar"};
-
-//HdfsInfo testHdfs = {"localhost", 9000, "bernardo"};
-//std::string workingDir = "/user/bernardo/cloud_test/";
-//JobInfo sparkJob = {"test.dummy.HdfsTest",  "/home/bernardo/projects/cloud_test/test/target/scala-2.10/test_2.10-0.1.0.jar"};
+HdfsInfo testHdfs = {"", 0, "", ""};
+JobInfo sparkJob = {"", ""};
 
 
 
@@ -189,14 +185,43 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   //dfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
   //SparkInfo spark = DeviceInfo.SparkClusters[device_id];
 
+  // Parsing configuration
+  INIReader reader("cloud_rtl.ini");
+
+  if (reader.ParseError() < 0) {
+    DP("Couldn't find 'cloud_rtl.ini'!");
+    return OFFLOAD_FAIL;
+  }
+
+  testHdfs.ServAddress = reader.Get("HDFS", "HostName", "");
+  testHdfs.ServPort = reader.GetInteger("HDFS", "Port", 0);
+  testHdfs.UserName = reader.Get("HDFS", "User", "");
+  testHdfs.WorkingDir = reader.Get("HDFS", "WorkingDir", "");
+
+  sparkJob.Package = reader.Get("Spark", "Package", "");
+  sparkJob.JarPath = reader.Get("Spark", "JarPath", "");
+
+  if (!testHdfs.ServAddress.compare("") ||
+      (testHdfs.ServPort == 0) ||
+      !testHdfs.UserName.compare("")) {
+    DP("Invalid values in 'cloud_rtl.ini' for HDFS!");
+    DP("Current values:\nHostName: '%s'\nPort: '%d'\nUser: '%s'\nWorkingDir: '%s'",
+       testHdfs.ServAddress.c_str(), testHdfs.ServPort, testHdfs.UserName.c_str(),
+       testHdfs.WorkingDir.c_str());
+    return OFFLOAD_FAIL;
+  }
+
+  if (!sparkJob.Package.compare("") ||
+      !sparkJob.JarPath.compare("")) {
+    DP("Invalid values in 'cloud_rtl.ini' for Spark!");
+    return OFFLOAD_FAIL;
+  }
+
   // Init connection to HDFS cluster
   struct hdfsBuilder *builder = hdfsNewBuilder();
-  //hdfsBuilderSetNameNode(builder, hdfs.ServAddress);
-  //hdfsBuilderSetNameNodePort(builder, hdfs.ServPort);
-  //hdfsBuilderSetUserName(builder, hdfs.UserName);
-  hdfsBuilderSetNameNode(builder, testHdfs.ServAddress);
+  hdfsBuilderSetNameNode(builder, testHdfs.ServAddress.c_str());
   hdfsBuilderSetNameNodePort(builder, testHdfs.ServPort);
-  hdfsBuilderSetUserName(builder, testHdfs.UserName);
+  hdfsBuilderSetUserName(builder, testHdfs.UserName.c_str());
   hdfsFS fs = hdfsBuilderConnect(builder);
   if(fs == NULL) {
     return OFFLOAD_FAIL;
@@ -207,8 +232,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
 
   // TODO: Init connection to Apache Spark cluster
 
-  if(hdfsExists(fs, workingDir.c_str()) < 0) {
-    retval = hdfsCreateDirectory(fs, workingDir.c_str());
+  if(hdfsExists(fs, testHdfs.WorkingDir.c_str()) < 0) {
+    retval = hdfsCreateDirectory(fs, testHdfs.WorkingDir.c_str());
     if(retval < 0) {
       DP("%s", hdfsGetLastError());
       return OFFLOAD_FAIL;
@@ -355,7 +380,7 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size){
   // TODO: something to do with the size too?
 
   // TODO: get basename from hdfs address or from local configuration from user
-  std::string filename = workingDir + std::to_string(highest);
+  std::string filename = testHdfs.WorkingDir + std::to_string(highest);
   currmapping.emplace(highest, filename);
 
   return (void *)highest;
@@ -441,7 +466,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   // TODO: create a function to create a file and write data to it
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
 
-  std::string addressFile = (workingDir + "__address_table");
+  std::string addressFile = (testHdfs.WorkingDir + "__address_table");
 
   hdfsFile file = hdfsOpenFile(fs, addressFile.c_str(), O_WRONLY, 0, 0, 0);
   if (file == NULL) {
@@ -475,7 +500,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   DP("Wrote address table in HDFS.\n");
 
   // FIXME: hardcoded execution
-  std::string cmd = "spark-submit --class " + sparkJob.package + " " + sparkJob.jarPath;
+  std::string cmd = "spark-submit --class " + sparkJob.Package + " " + sparkJob.JarPath;
   FILE *fp = popen(cmd.c_str(), "r");
 
   if (fp == NULL) {
