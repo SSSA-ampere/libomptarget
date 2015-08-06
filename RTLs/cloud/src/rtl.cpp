@@ -217,6 +217,12 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     return OFFLOAD_FAIL;
   }
 
+  // Checking if given WorkingDir ends in a slash for path concatenation.
+  // If it doesn't, add it
+  if (testHdfs.WorkingDir.back() != '/') {
+    testHdfs.WorkingDir += "/";
+  }
+
   // Init connection to HDFS cluster
   struct hdfsBuilder *builder = hdfsNewBuilder();
   hdfsBuilderSetNameNode(builder, testHdfs.ServAddress.c_str());
