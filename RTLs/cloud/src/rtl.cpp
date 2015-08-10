@@ -17,10 +17,10 @@
 #include <hdfs.h>
 
 #include <dlfcn.h>
-//#include <elf.h>
+#include <elf.h>
 #include <gelf.h>
 #include <string.h>
-//#include <link.h>
+#include <link.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -304,7 +304,67 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
     return NULL;
   }
 
-return NULL;
+  DP("Offset of entries section is (%016lx).\n", entries_offset);
+
+  // load dynamic library and get the entry points. We use the dl library
+  // to do the loading of the library, but we could do it directly to avoid the
+  // dump to the temporary file.
+  //
+  // 1) Create tmp file with the library contents
+  // 2) Use dlopen to load the file and dlsym to retrieve the symbols
+  char tmp_name[] = "/tmp/tmpfile_XXXXXX";
+  int tmp_fd = mkstemp (tmp_name);
+
+  if( tmp_fd == -1 ){
+    elf_end(e);
+    return NULL;
+  }
+
+  FILE *ftmp = fdopen(tmp_fd, "wb");
+
+  if( !ftmp ){
+    elf_end(e);
+    return NULL;
+  }
+
+  fwrite(image->ImageStart,ImageSize,1,ftmp);
+  fclose(ftmp);
+
+  DynLibTy Lib = { tmp_name, dlopen(tmp_name,RTLD_LAZY) };
+
+  if(!Lib.Handle){
+    DP("target library loading error: %s\n",dlerror());
+    elf_end(e);
+    return NULL;
+  }
+
+  struct link_map *libInfo = (struct link_map *)Lib.Handle;
+
+  // The place where the entries info is loaded is the library base address
+  // plus the offset determined from the ELF file.
+  Elf64_Addr entries_addr = libInfo->l_addr + entries_offset;
+
+  DP("Pointer to first entry to be loaded is (%016lx).\n", entries_addr);
+
+  // Table of pointers to all the entries in the target
+  __tgt_offload_entry *entries_table = (__tgt_offload_entry*)entries_addr;
+
+
+  __tgt_offload_entry *entries_begin = &entries_table[0];
+  __tgt_offload_entry *entries_end =  entries_begin + NumEntries;
+
+  if(!entries_begin){
+    DP("Can't obtain entries begin\n");
+    elf_end(e);
+    return NULL;
+  }
+
+  DP("Entries table range is (%016lx)->(%016lx)\n",(Elf64_Addr)entries_begin,(Elf64_Addr)entries_end)
+  DeviceInfo.createOffloadTable(device_id,entries_begin,entries_end);
+
+  elf_end(e);
+
+  return DeviceInfo.getOffloadEntriesTable(device_id);
 }
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size){
