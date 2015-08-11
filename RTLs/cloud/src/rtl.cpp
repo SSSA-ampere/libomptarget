@@ -61,6 +61,12 @@ struct JobInfo{
   std::string JarPath;
 };
 
+struct AddressTableItem {
+  uintptr_t Address;
+  std::string FilePath;
+  uint8_t MapFromFlag;
+};
+
 
 // Configuration variables
 HdfsInfo testHdfs = {"", 0, "", ""};
@@ -89,7 +95,7 @@ public:
   // well. That way, we can map each hdfsFS to their corresponding addresses
   // table. However, that would require hdfsFS to be hasheable - see documentation
   // on unordered_map to know more
-  std::vector<std::unordered_map<uintptr_t, std::string>> HdfsAddresses;
+  std::vector<std::vector<AddressTableItem>> HdfsAddresses;
 
   // Record entry point associated with device
   void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin, __tgt_offload_entry *end){
@@ -367,17 +373,17 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }
 
-void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size){
+void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type){
   // NOTE: we do not create the HDFS file here because we do not want to
   // waste time creating stuff that we might not need before (there may be
   // unecessary allocations)
-  std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
+  std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
 
   // TODO: there's certainly a better way to do this
   uintptr_t highest = 0;
   for (auto &itr : currmapping) {
-    if (itr.first > highest) {
-      highest = itr.first;
+    if (itr.Address > highest) {
+      highest = itr.Address;
     }
   }
 
@@ -385,9 +391,12 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size){
 
   // TODO: something to do with the size too?
 
-  // TODO: get basename from hdfs address or from local configuration from user
-  std::string filename = testHdfs.WorkingDir + std::to_string(highest);
-  currmapping.emplace(highest, filename);
+  AddressTableItem newitem;
+  newitem.Address = highest;
+  newitem.FilePath = testHdfs.WorkingDir + std::to_string(highest);;
+  newitem.MapFromFlag = type & tgt_map_from ? 1 : 0;
+
+  currmapping.push_back(newitem);
 
   return (void *)highest;
 }
@@ -397,9 +406,18 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, i
   DP("Submitting data for device %d\n", device_id);
 
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-  std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
+  std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
   uintptr_t targetaddr = (uintptr_t)tgt_ptr;
-  std::string filename = currmapping[targetaddr];
+  std::vector<AddressTableItem>::iterator itr;
+
+  // Searching for element
+  for (itr = currmapping.begin(); itr != currmapping.end(); ++itr) {
+    if ((*itr).Address == targetaddr) {
+      break;
+    }
+  }
+
+  std::string filename = (*itr).FilePath;
 
   DP("Writing data in file '%s'\n", filename.c_str());
 
@@ -426,9 +444,18 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, i
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr, int64_t size){
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-  std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
+  std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
   uintptr_t targetaddr = (uintptr_t)tgt_ptr;
-  std::string filename = currmapping[targetaddr];
+  std::vector<AddressTableItem>::iterator itr;
+
+  // Searching for element
+  for (itr = currmapping.begin(); itr != currmapping.end(); ++itr) {
+    if ((*itr).Address == targetaddr) {
+      break;
+    }
+  }
+
+  std::string filename = (*itr).FilePath;
 
   DP("Reading data from file '%s'\n", filename.c_str());
 
@@ -480,17 +507,22 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
     return OFFLOAD_FAIL;
   }
 
-  std::unordered_map<uintptr_t, std::string> &currmapping = DeviceInfo.HdfsAddresses[device_id];
-
+  std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
 
   for (auto &itr : currmapping) {
-    retval = hdfsWrite(fs, file, &(itr.first), sizeof(uintptr_t));
+    retval = hdfsWrite(fs, file, &(itr.Address), sizeof(uintptr_t));
     if(retval < 0) {
       DP("Couldn't write address table!\n%s", hdfsGetLastError());
       return OFFLOAD_FAIL;
     }
 
-    retval = hdfsWrite(fs, file, itr.second.c_str(), itr.second.length() + 1);
+    retval = hdfsWrite(fs, file, &(itr.MapFromFlag), 1);
+    if (retval < 0) {
+      DP("Couldn't write address table!\n%s", hdfsGetLastError());
+      return OFFLOAD_FAIL;
+    }
+
+    retval = hdfsWrite(fs, file, itr.FilePath.c_str(), itr.FilePath.length() + 1);
     if(retval < 0) {
       DP("Couldn't write address table!\n%s", hdfsGetLastError());
       return OFFLOAD_FAIL;
@@ -507,6 +539,20 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 
   // FIXME: hardcoded execution
   std::string cmd = "spark-submit --class " + sparkJob.Package + " " + sparkJob.JarPath;
+
+  // hardcoded execution arguments
+  if (testHdfs.ServAddress.find("://") == std::string::npos) {
+    cmd += " hdfs://" + testHdfs.ServAddress;
+  }
+
+  if (testHdfs.ServAddress.back() == '/') {
+    cmd.erase(cmd.end() - 1);
+  }
+
+  cmd += ":" + testHdfs.ServPort;
+  cmd += " " + testHdfs.UserName;
+  cmd += " " + testHdfs.WorkingDir;
+
   FILE *fp = popen(cmd.c_str(), "r");
 
   if (fp == NULL) {
