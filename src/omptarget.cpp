@@ -722,14 +722,14 @@ EXTERN int __tgt_target_data_update(int32_t device_id, int32_t arg_num,
       DP("Moving %ld bytes (tgt:%016lx) -> (hst:%016lx)\n", (long)arg_sizes[i],
         (long)TgtPtrBegin, (long)HstPtrBegin);
       res = Device.data_retrieve(HstPtrBegin, TgtPtrBegin, arg_sizes[i]);
-      if(res != 0)
+      if(res != OFFLOAD_SUCCESS)
         return OFFLOAD_FAIL;
     } 
     if (arg_types[i] & tgt_map_to) {
       DP("Moving %ld bytes (hst:%016lx) -> (tgt:%016lx)\n", (long)arg_sizes[i],
         (long)HstPtrBegin, (long)TgtPtrBegin);
       res = Device.data_submit(TgtPtrBegin, HstPtrBegin, arg_sizes[i]);
-      if(res != 0)
+      if(res != OFFLOAD_SUCCESS)
         return OFFLOAD_FAIL;
     }
   }
