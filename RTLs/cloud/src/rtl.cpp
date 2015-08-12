@@ -207,13 +207,14 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   sparkJob.Package = reader.Get("Spark", "Package", "");
   sparkJob.JarPath = reader.Get("Spark", "JarPath", "");
 
+  DP("HDFS HostName: '%s' - Port: '%d' - User: '%s' - WorkingDir: '%s'\n",
+     testHdfs.ServAddress.c_str(), testHdfs.ServPort, testHdfs.UserName.c_str(),
+     testHdfs.WorkingDir.c_str());
+
   if (!testHdfs.ServAddress.compare("") ||
       (testHdfs.ServPort == 0) ||
       !testHdfs.UserName.compare("")) {
     DP("Invalid values in 'cloud_rtl.ini' for HDFS!");
-    DP("Current values:\nHostName: '%s'\nPort: '%d'\nUser: '%s'\nWorkingDir: '%s'",
-       testHdfs.ServAddress.c_str(), testHdfs.ServPort, testHdfs.UserName.c_str(),
-       testHdfs.WorkingDir.c_str());
     return OFFLOAD_FAIL;
   }
 
