@@ -17,10 +17,11 @@
 #include <hdfs.h>
 
 #include <dlfcn.h>
-#include <elf.h>
 #include <gelf.h>
 #include <string.h>
+#ifndef __APPLE__
 #include <link.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -345,6 +346,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
     return NULL;
   }
 
+#ifndef __APPLE__
   struct link_map *libInfo = (struct link_map *)Lib.Handle;
 
   // The place where the entries info is loaded is the library base address
@@ -370,6 +372,8 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   DeviceInfo.createOffloadTable(device_id,entries_begin,entries_end);
 
   elf_end(e);
+
+#endif
 
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }
