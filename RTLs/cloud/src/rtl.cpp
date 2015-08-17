@@ -14,6 +14,8 @@
 #include <assert.h>
 #include <vector>
 #include <unordered_map>
+#include <iostream>
+#include <fstream>
 #include <hdfs.h>
 
 #include <dlfcn.h>
@@ -175,6 +177,69 @@ int _cloud_spark_create_program() {
   return 0;
 }
 
+int32_t send_file_to_hdfs(int32_t device_id, char *filename, char *tgtfilename) {
+  DP("Submitting file for device %d\n", device_id);
+
+  // TODO: Assuming the target runs Linux
+  std::string stgtfilename(tgtfilename);
+  std::string libraryFile = (testHdfs.WorkingDir + stgtfilename);
+
+  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
+
+  DP("Writing data in file '%s'\n", libraryFile.c_str());
+
+  hdfsFile file = hdfsOpenFile(fs, libraryFile.c_str(), O_WRONLY, 0, 0, 0);
+  if(file == NULL) {
+    DP("Opening failed.\n%s", hdfsGetLastError());
+    return -1;
+  }
+
+  std::ifstream hstfile(filename, std::ios::in|std::ios::binary);
+
+  if (!hstfile.is_open()) {
+    DP("Opening host file %s failed.", filename);
+    hdfsCloseFile(fs, file);
+    return -1;
+  }
+
+  DP("Reading...\n");
+
+  // TODO: Malloc this buffer
+  char buffer[4096] = {0};
+  int retval;
+
+  while (true) {
+    hstfile.read(buffer, 4096);
+
+    if (!hstfile.good()) {
+      if (!hstfile.eof()) {
+        break;
+      }
+    }
+
+    retval = hdfsWrite(fs, file, buffer, hstfile.gcount());
+    if(retval < 0) {
+      DP("Writing failed.\n%s", hdfsGetLastError());
+      hdfsCloseFile(fs, file);
+      return -1;
+    }
+
+    if (hstfile.eof()) {
+      break;
+    }
+  }
+
+  hstfile.close();
+
+  retval = hdfsCloseFile(fs, file);
+  if(retval < 0) {
+    DP("Closing failed.\n%s", hdfsGetLastError());
+    return -1;
+  }
+
+  return 0;
+}
+
 int __tgt_rtl_device_type(int32_t device_id){
 
   return 0;
@@ -323,24 +388,31 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   char tmp_name[] = "/tmp/tmpfile_XXXXXX";
   int tmp_fd = mkstemp (tmp_name);
 
-  if( tmp_fd == -1 ){
+  if (tmp_fd == -1) {
     elf_end(e);
     return NULL;
   }
 
   FILE *ftmp = fdopen(tmp_fd, "wb");
 
-  if( !ftmp ){
+  if(!ftmp) {
     elf_end(e);
     return NULL;
   }
 
-  fwrite(image->ImageStart,ImageSize,1,ftmp);
+  fwrite(image->ImageStart, ImageSize, 1, ftmp);
   fclose(ftmp);
 
-  DynLibTy Lib = { tmp_name, dlopen(tmp_name,RTLD_LAZY) };
+  DP("Trying to send lib to HDFS\n");
 
-  if(!Lib.Handle){
+  // Sending file to HDFS as the library to be loaded
+  send_file_to_hdfs(device_id, tmp_name, "libmr.so");
+
+  DP("Lib sent to HDFS!\n");
+
+  DynLibTy Lib = { tmp_name, dlopen(tmp_name, RTLD_LAZY) };
+
+  if (!Lib.Handle) {
     DP("target library loading error: %s\n",dlerror());
     elf_end(e);
     return NULL;
@@ -358,8 +430,13 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   // Table of pointers to all the entries in the target
   __tgt_offload_entry *entries_table = (__tgt_offload_entry*)entries_addr;
 
-
   __tgt_offload_entry *entries_begin = &entries_table[0];
+
+  DP("Entry begin: (%016lx)\nEntry name: (%s)\nEntry size: (%016lx)\n",
+     (uintptr_t)entries_begin->addr, entries_begin->name, entries_begin->size);
+  DP("Next entry: (%016lx)\nEntry name: (%s)\nEntry size: (%016lx)\n",
+     (uintptr_t)entries_table[1].addr, entries_table[1].name, entries_table[1].size);
+
   __tgt_offload_entry *entries_end =  entries_begin + NumEntries;
 
   if(!entries_begin){
