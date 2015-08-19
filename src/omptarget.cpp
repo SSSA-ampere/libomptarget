@@ -537,7 +537,7 @@ static int target_data_begin(DeviceTy & Device, int32_t arg_num,
       DP("has a pointer entry: \n");
       // base is address of poiner
       Pointer_TgtPtrBegin = Device.getOrAllocTgtPtr(HstPtrBase, HstPtrBase,
-        sizeof(void *), Pointer_IsNew, arg_types[i]);
+        sizeof(void *), Pointer_IsNew, true, arg_types[i]);
       DP("There are %ld bytes allocated at target address %016lx\n",
          (long)sizeof(void *), (long)Pointer_TgtPtrBegin);
       assert(Pointer_TgtPtrBegin && "Data allocation by RTL returned invalid ptr");
@@ -546,7 +546,7 @@ static int target_data_begin(DeviceTy & Device, int32_t arg_num,
     }
 
     void *TgtPtrBegin = Device.getOrAllocTgtPtr(HstPtrBegin, HstPtrBase,
-      arg_sizes[i], IsNew, arg_types[i]);
+      arg_sizes[i], IsNew, true, arg_types[i]);
     DP("There are %ld bytes allocated at target address %016lx - is new %ld\n",
       (long)arg_sizes[i], (long)TgtPtrBegin, IsNew);
     assert(TgtPtrBegin && "Data allocation by RTL returned invalid ptr");

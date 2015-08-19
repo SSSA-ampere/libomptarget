@@ -581,7 +581,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   // TODO: create a function to create a file and write data to it
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
 
-  std::string addressFile = (testHdfs.WorkingDir + "__address_table");
+  std::string addressFile = (testHdfs.WorkingDir + "address_table");
 
   hdfsFile file = hdfsOpenFile(fs, addressFile.c_str(), O_WRONLY, 0, 0, 0);
   if (file == NULL) {
@@ -590,6 +590,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   }
 
   std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
+  int totalitems = 0;
 
   for (auto &itr : currmapping) {
     retval = hdfsWrite(fs, file, &(itr.Address), sizeof(uintptr_t));
@@ -598,7 +599,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
       return OFFLOAD_FAIL;
     }
 
-    retval = hdfsWrite(fs, file, &(itr.MapFromFlag), 1);
+    retval = hdfsWrite(fs, file, &(itr.MapFromFlag), sizeof(uint8_t));
     if (retval < 0) {
       DP("Couldn't write address table!\n%s", hdfsGetLastError());
       return OFFLOAD_FAIL;
@@ -609,6 +610,8 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
       DP("Couldn't write address table!\n%s", hdfsGetLastError());
       return OFFLOAD_FAIL;
     }
+
+    totalitems++;
   }
 
   retval = hdfsCloseFile(fs, file);
@@ -617,7 +620,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
     return OFFLOAD_FAIL;
   }
 
-  DP("Wrote address table in HDFS.\n");
+  DP("Wrote address table with %d entries in HDFS.\n", totalitems);
 
   // FIXME: hardcoded execution
   std::string cmd = "spark-submit --class " + sparkJob.Package + " " + sparkJob.JarPath;
@@ -631,9 +634,11 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
     cmd.erase(cmd.end() - 1);
   }
 
-  cmd += ":" + testHdfs.ServPort;
+  cmd += ":" + std::to_string(testHdfs.ServPort);
   cmd += " " + testHdfs.UserName;
   cmd += " " + testHdfs.WorkingDir;
+
+  DP("Executing command: %s\n", cmd.c_str());
 
   FILE *fp = popen(cmd.c_str(), "r");
 
