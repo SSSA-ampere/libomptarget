@@ -37,7 +37,7 @@
 #define NUMBER_OF_DEVICES 1
 
 /// Array of Dynamic libraries loaded for this target
-struct DynLibTy{
+struct DynLibTy {
   char *FileName;
   void* Handle;
 };
@@ -476,7 +476,15 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type){
   AddressTableItem newitem;
   newitem.Address = highest;
   newitem.FilePath = testHdfs.WorkingDir + std::to_string(highest);;
-  newitem.MapFromFlag = type & tgt_map_from ? 1 : 0;
+  newitem.MapFromFlag = 0;
+
+  if (type & tgt_map_from) {
+    newitem.MapFromFlag |= 1;
+  }
+
+  if (type & tgt_map_to) {
+    newitem.MapFromFlag |= 2;
+  }
 
   currmapping.push_back(newitem);
 
@@ -564,24 +572,45 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr){
   // TODO: remove HDFS file
-  /*hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-  hdfsFile file = hdfsOpenFile(fs, "", O_WRONLY, 0, 0, 0);
+  /*hdfsFile file = hdfsOpenFile(fs, "", O_WRONLY, 0, 0, 0);
   hdfsDelete(fs, "", 0);*/
+
+  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
+  std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
+  uintptr_t targetaddr = (uintptr_t)tgt_ptr;
+  std::vector<AddressTableItem>::iterator itr;
+
+  // Searching for element
+  for (itr = currmapping.begin(); itr != currmapping.end(); ++itr) {
+    if ((*itr).Address == targetaddr) {
+      break;
+    }
+  }
+
+  std::string filename = (*itr).FilePath;
+
+  DP("Deleting file '%s'\n", filename.c_str());
+
+  int retval = hdfsDelete(fs, filename.c_str(), 0);
+  if(retval < 0) {
+    DP("Deleting file failed.\n%s", hdfsGetLastError());
+    return OFFLOAD_FAIL;
+  }
+
+  // TODO: Also remove item from entry list
+
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
    void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit)
 {
-  int retval = 0;
-
-  // run hardcoded spark kernel
   // Before launching, write address table in special file which will be read by
   // the scala kernel
   // TODO: create a function to create a file and write data to it
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
 
-  std::string addressFile = (testHdfs.WorkingDir + "address_table");
+  std::string addressFile = (testHdfs.WorkingDir + "__address_table");
 
   hdfsFile file = hdfsOpenFile(fs, addressFile.c_str(), O_WRONLY, 0, 0, 0);
   if (file == NULL) {
@@ -591,6 +620,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 
   std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
   int totalitems = 0;
+  int retval = 0;
 
   for (auto &itr : currmapping) {
     retval = hdfsWrite(fs, file, &(itr.Address), sizeof(uintptr_t));
@@ -622,7 +652,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 
   DP("Wrote address table with %d entries in HDFS.\n", totalitems);
 
-  // FIXME: hardcoded execution
+  // TODO FIXME: hardcoded execution
   std::string cmd = "spark-submit --class " + sparkJob.Package + " " + sparkJob.JarPath;
 
   // hardcoded execution arguments
