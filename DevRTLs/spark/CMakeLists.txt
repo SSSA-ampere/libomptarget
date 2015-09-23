@@ -17,7 +17,8 @@ if(SBT_FOUND)
 
     message("Building Spark device RTL")
 
-    add_custom_target(omptarget-spark ALL COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && sbt publish-local)
+    add_custom_target(omptarget-spark ALL
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ${SBT_EXECUTABLE} publish-local)
 
 else()
 
