@@ -434,8 +434,8 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
 
   DP("Entry begin: (%016lx)\nEntry name: (%s)\nEntry size: (%016lx)\n",
      (uintptr_t)entries_begin->addr, entries_begin->name, entries_begin->size);
-  DP("Next entry: (%016lx)\nEntry name: (%s)\nEntry size: (%016lx)\n",
-     (uintptr_t)entries_table[1].addr, entries_table[1].name, entries_table[1].size);
+  //DP("Next entry: (%016lx)\nEntry name: (%s)\nEntry size: (%016lx)\n",
+  //   (uintptr_t)entries_table[1].addr, entries_table[1].name, entries_table[1].size);
 
   __tgt_offload_entry *entries_end =  entries_begin + NumEntries;
 
