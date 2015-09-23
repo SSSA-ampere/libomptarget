@@ -455,7 +455,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }
 
-void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type){
+void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type, int32_t id){
   // NOTE: we do not create the HDFS file here because we do not want to
   // waste time creating stuff that we might not need before (there may be
   // unecessary allocations)
@@ -491,7 +491,7 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type){
   return (void *)highest;
 }
 
-int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, int64_t size){
+int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id){
   // Since we now need the hdfs file, we create it here
   DP("Submitting data for device %d\n", device_id);
 
@@ -509,7 +509,7 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, i
 
   std::string filename = (*itr).FilePath;
 
-  DP("Writing data in file '%s'\n", filename.c_str());
+  DP("Writing data %d of size %d in file '%s'\n", id, size, filename.c_str());
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
   if(file == NULL) {
@@ -532,7 +532,7 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, i
   return OFFLOAD_SUCCESS;
 }
 
-int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr, int64_t size){
+int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id){
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
   std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
   uintptr_t targetaddr = (uintptr_t)tgt_ptr;
@@ -570,7 +570,7 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
   return OFFLOAD_SUCCESS;
 }
 
-int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr){
+int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr, int32_t id){
   // TODO: remove HDFS file
   /*hdfsFile file = hdfsOpenFile(fs, "", O_WRONLY, 0, 0, 0);
   hdfsDelete(fs, "", 0);*/
