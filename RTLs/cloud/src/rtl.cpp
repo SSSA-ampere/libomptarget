@@ -509,7 +509,7 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, i
 
   std::string filename = (*itr).FilePath;
 
-  DP("Writing data %d of size %d in file '%s'\n", id, size, filename.c_str());
+  DP("Writing data %d of size %lld in file '%s'\n", id, size, filename.c_str());
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
   if(file == NULL) {
