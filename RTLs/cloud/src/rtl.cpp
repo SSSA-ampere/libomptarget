@@ -26,6 +26,7 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "omptarget.h"
 #include "INIReader.h"
@@ -51,20 +52,15 @@ struct HdfsInfo{
   int ServPort;
   std::string UserName;
   std::string WorkingDir;
+  uintptr_t currAddr;
 };
 
 struct SparkInfo{
-  char *Name;
-  char *Url;
-  int Port;
+  std::string ServAddress;
+  int ServPort;
+  std::string UserName;
   std::string Package;
   std::string JarPath;
-};
-
-struct AddressTableItem {
-  uintptr_t Address;
-  std::string FilePath;
-  uint8_t MapFromFlag;
 };
 
 
@@ -84,11 +80,6 @@ public:
   std::vector<SparkInfo> SparkClusters;
 
   std::vector<hdfsFS> HdfsNodes;
-  // TODO: I believe the best way would be for HdfsAddresses to be an unordered_map as
-  // well. That way, we can map each hdfsFS to their corresponding addresses
-  // table. However, that would require hdfsFS to be hasheable - see documentation
-  // on unordered_map to know more
-  std::vector<std::vector<AddressTableItem>> HdfsAddresses;
 
   // Record entry point associated with device
   void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin, __tgt_offload_entry *end){
@@ -130,7 +121,6 @@ public:
     HdfsClusters.resize(NumberOfDevices);
     SparkClusters.resize(NumberOfDevices);
     HdfsNodes.resize(NumberOfDevices);
-    HdfsAddresses.resize(NumberOfDevices);
   }
 
   ~RTLDeviceInfoTy(){
@@ -246,9 +236,6 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
 
   DP ("Getting device %d\n", device_id);
 
-  //dfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
-  //SparkInfo spark = DeviceInfo.SparkClusters[device_id];
-
   // Parsing configuration
   INIReader reader("cloud_rtl.ini");
 
@@ -257,20 +244,13 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     return OFFLOAD_FAIL;
   }
 
-  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
-  SparkInfo sparkJob = DeviceInfo.SparkClusters[device_id];
-
-  hdfs.ServAddress = reader.Get("HDFS", "HostName", "");
-  hdfs.ServPort = reader.GetInteger("HDFS", "Port", 0);
-  hdfs.UserName = reader.Get("HDFS", "User", "");
-  hdfs.WorkingDir = reader.Get("HDFS", "WorkingDir", "");
-
-  sparkJob.Package = reader.Get("Spark", "Package", "");
-  sparkJob.JarPath = reader.Get("Spark", "JarPath", "");
-
-  DP("HDFS HostName: '%s' - Port: '%d' - User: '%s' - WorkingDir: '%s'\n",
-     hdfs.ServAddress.c_str(), hdfs.ServPort, hdfs.UserName.c_str(),
-     hdfs.WorkingDir.c_str());
+  HdfsInfo hdfs {
+    reader.Get("HDFS", "HostName", ""),
+    (int) reader.GetInteger("HDFS", "Port", 0),
+    reader.Get("HDFS", "User", ""),
+    reader.Get("HDFS", "WorkingDir", ""),
+    1,
+  };
 
   if (!hdfs.ServAddress.compare("") ||
       (hdfs.ServPort == 0) ||
@@ -279,11 +259,9 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     return OFFLOAD_FAIL;
   }
 
-  if (!sparkJob.Package.compare("") ||
-      !sparkJob.JarPath.compare("")) {
-    DP("Invalid values in 'cloud_rtl.ini' for Spark!");
-    return OFFLOAD_FAIL;
-  }
+  DP("HDFS HostName: '%s' - Port: '%d' - User: '%s' - WorkingDir: '%s'\n",
+     hdfs.ServAddress.c_str(), hdfs.ServPort, hdfs.UserName.c_str(),
+     hdfs.WorkingDir.c_str());
 
   // Checking if given WorkingDir ends in a slash for path concatenation.
   // If it doesn't, add it
@@ -304,8 +282,6 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   hdfsFreeBuilder(builder);
   DeviceInfo.HdfsNodes[device_id] = fs;
 
-  // TODO: Init connection to Apache Spark cluster
-
   if(hdfsExists(fs, hdfs.WorkingDir.c_str()) < 0) {
     retval = hdfsCreateDirectory(fs, hdfs.WorkingDir.c_str());
     if(retval < 0) {
@@ -313,6 +289,29 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
       return OFFLOAD_FAIL;
     }
   }
+
+  // TODO: Init connection to Apache Spark cluster
+
+  SparkInfo spark {
+    reader.Get("HDFS", "HostName", ""),
+    (int) reader.GetInteger("HDFS", "Port", 0),
+    reader.Get("HDFS", "User", ""),
+    reader.Get("Spark", "Package", ""),
+    reader.Get("Spark", "JarPath", ""),
+  };
+
+  if (!spark.Package.compare("") ||
+      !spark.JarPath.compare("")) {
+    DP("Invalid values in 'cloud_rtl.ini' for Spark!");
+    return OFFLOAD_FAIL;
+  }
+
+  DP("Spark HostName: '%s' - Port: '%d' - User: '%s' - WorkingDir: '%s'\n",
+     spark.ServAddress.c_str(), spark.ServPort, spark.UserName.c_str(),
+     hdfs.WorkingDir.c_str());
+
+  DeviceInfo.HdfsClusters[device_id] = hdfs;
+  DeviceInfo.SparkClusters[device_id] = spark;
 
   return OFFLOAD_SUCCESS; // success
 }
@@ -451,64 +450,30 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
 }
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type, int32_t id){
-  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
-
   // NOTE: we do not create the HDFS file here because we do not want to
   // waste time creating stuff that we might not need before (there may be
   // unecessary allocations)
-  std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
 
-  // TODO: there's certainly a better way to do this
-  uintptr_t highest = 0;
-  for (auto &itr : currmapping) {
-    if (itr.Address > highest) {
-      highest = itr.Address;
-    }
-  }
-
-  highest += 1;
-
-  // TODO: something to do with the size too?
-
-  AddressTableItem newitem;
-  newitem.Address = highest;
-  newitem.FilePath = hdfs.WorkingDir + std::to_string(highest);;
-  newitem.MapFromFlag = 0;
-
-  if (type & tgt_map_from) {
-    newitem.MapFromFlag |= 1;
-  }
-
-  if (type & tgt_map_to) {
-    newitem.MapFromFlag |= 2;
-  }
-
-  currmapping.push_back(newitem);
-
-  return (void *)highest;
+  // Return fake target address
+  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
+  return (void *)hdfs.currAddr++;
 }
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id){
+  if(id < 0) {
+    DP("Not need to submit pointer for device %d\n", device_id);
+    return OFFLOAD_SUCCESS;
+  }
+
   // Since we now need the hdfs file, we create it here
   DP("Submitting data for device %d\n", device_id);
 
   HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-  std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
-
-  uintptr_t targetaddr = (uintptr_t)tgt_ptr;
-  std::vector<AddressTableItem>::iterator itr;
-
-  // Searching for element
-  for (itr = currmapping.begin(); itr != currmapping.end(); ++itr) {
-    if ((*itr).Address == targetaddr) {
-      break;
-    }
-  }
 
   std::string filename = hdfs.WorkingDir + std::to_string(id);
 
-  DP("Writing data %d of size %lld in file '%s'\n", id, size, filename.c_str());
+  DP("Writing data in file '%s'\n", filename.c_str());
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
   if(file == NULL) {
@@ -532,19 +497,11 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, i
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id){
+
+  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-  std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
-  uintptr_t targetaddr = (uintptr_t)tgt_ptr;
-  std::vector<AddressTableItem>::iterator itr;
 
-  // Searching for element
-  for (itr = currmapping.begin(); itr != currmapping.end(); ++itr) {
-    if ((*itr).Address == targetaddr) {
-      break;
-    }
-  }
-
-  std::string filename = (*itr).FilePath;
+  std::string filename = hdfs.WorkingDir + std::to_string(id);
 
   DP("Reading data from file '%s'\n", filename.c_str());
 
@@ -570,23 +527,15 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr, int32_t id){
-  // TODO: remove HDFS file
-  /*hdfsFile file = hdfsOpenFile(fs, "", O_WRONLY, 0, 0, 0);
-  hdfsDelete(fs, "", 0);*/
-
-  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-  std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
-  uintptr_t targetaddr = (uintptr_t)tgt_ptr;
-  std::vector<AddressTableItem>::iterator itr;
-
-  // Searching for element
-  for (itr = currmapping.begin(); itr != currmapping.end(); ++itr) {
-    if ((*itr).Address == targetaddr) {
-      break;
-    }
+  if(id < 0) {
+    DP("No file to delete\n");
+    return OFFLOAD_SUCCESS;
   }
 
-  std::string filename = (*itr).FilePath;
+  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
+  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
+
+  std::string filename = hdfs.WorkingDir + std::to_string(id);
 
   DP("Deleting file '%s'\n", filename.c_str());
 
@@ -596,8 +545,6 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr, int32_t id){
     return OFFLOAD_FAIL;
   }
 
-  // TODO: Also remove item from entry list
-
   return OFFLOAD_SUCCESS;
 }
 
@@ -606,53 +553,6 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 {
   HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
   SparkInfo spark = DeviceInfo.SparkClusters[device_id];
-
-  // Before launching, write address table in special file which will be read by
-  // the scala kernel
-  // TODO: create a function to create a file and write data to it
-  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-
-  std::string addressFile = (hdfs.WorkingDir + "__address_table");
-
-  hdfsFile file = hdfsOpenFile(fs, addressFile.c_str(), O_WRONLY, 0, 0, 0);
-  if (file == NULL) {
-    DP("Couldn't create address table file!\n%s", hdfsGetLastError());
-    return OFFLOAD_FAIL;
-  }
-
-  std::vector<AddressTableItem> &currmapping = DeviceInfo.HdfsAddresses[device_id];
-  int totalitems = 0;
-  int retval = 0;
-
-  for (auto &itr : currmapping) {
-    retval = hdfsWrite(fs, file, &(itr.Address), sizeof(uintptr_t));
-    if(retval < 0) {
-      DP("Couldn't write address table!\n%s", hdfsGetLastError());
-      return OFFLOAD_FAIL;
-    }
-
-    retval = hdfsWrite(fs, file, &(itr.MapFromFlag), sizeof(uint8_t));
-    if (retval < 0) {
-      DP("Couldn't write address table!\n%s", hdfsGetLastError());
-      return OFFLOAD_FAIL;
-    }
-
-    retval = hdfsWrite(fs, file, itr.FilePath.c_str(), itr.FilePath.length() + 1);
-    if(retval < 0) {
-      DP("Couldn't write address table!\n%s", hdfsGetLastError());
-      return OFFLOAD_FAIL;
-    }
-
-    totalitems++;
-  }
-
-  retval = hdfsCloseFile(fs, file);
-  if(retval < 0) {
-    DP("Error when creating address table in HDFS.\n%s", hdfsGetLastError());
-    return OFFLOAD_FAIL;
-  }
-
-  DP("Wrote address table with %d entries in HDFS.\n", totalitems);
 
   // TODO FIXME: hardcoded execution
   std::string cmd = "spark-submit --class " + spark.Package + " " + spark.JarPath;
