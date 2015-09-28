@@ -63,6 +63,12 @@ struct SparkInfo{
   std::string JarPath;
 };
 
+struct AddressTableItem {
+  uintptr_t Address;
+  std::string FilePath;
+  uint8_t MapFromFlag;
+};
+
 
 /// Keep entries table per device
 struct FuncOrGblEntryTy{
@@ -80,6 +86,12 @@ public:
   std::vector<SparkInfo> SparkClusters;
 
   std::vector<hdfsFS> HdfsNodes;
+
+  // TODO: I believe the best way would be for HdfsAddresses to be an unordered_map as
+  // well. That way, we can map each hdfsFS to their corresponding addresses
+  // table. However, that would require hdfsFS to be hasheable - see documentation
+  // on unordered_map to know more
+  std::vector<std::map<int, AddressTableItem>> HdfsAddresses;
 
   // Record entry point associated with device
   void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin, __tgt_offload_entry *end){
@@ -121,6 +133,7 @@ public:
     HdfsClusters.resize(NumberOfDevices);
     SparkClusters.resize(NumberOfDevices);
     HdfsNodes.resize(NumberOfDevices);
+    HdfsAddresses.resize(NumberOfDevices);
   }
 
   ~RTLDeviceInfoTy(){
@@ -456,6 +469,23 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type, int32_
 
   // Return fake target address
   HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
+
+  AddressTableItem newitem {
+    0,
+    hdfs.WorkingDir + std::to_string(id),
+    0,
+  };
+
+  if (type & tgt_map_from) {
+    newitem.MapFromFlag |= 1;
+  }
+
+  if (type & tgt_map_to) {
+    newitem.MapFromFlag |= 2;
+  }
+
+  DeviceInfo.HdfsAddresses[device_id][id] = newitem;
+
   return (void *)hdfs.currAddr++;
 }
 
@@ -553,6 +583,53 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 {
   HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
   SparkInfo spark = DeviceInfo.SparkClusters[device_id];
+  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
+
+  // Before launching, write address table in special file which will be read by
+  // the scala kernel
+  // TODO: create a function to create a file and write data to it
+
+  std::string addressFile = (hdfs.WorkingDir + "__address_table");
+
+  hdfsFile file = hdfsOpenFile(fs, addressFile.c_str(), O_WRONLY, 0, 0, 0);
+  if (file == NULL) {
+    DP("Couldn't create address table file!\n%s", hdfsGetLastError());
+    return OFFLOAD_FAIL;
+  }
+
+  std::map<int, AddressTableItem> &AddTable = DeviceInfo.HdfsAddresses[device_id];
+  int totalitems = 0;
+  int retval = 0;
+
+  for (auto it = AddTable.begin(); it != AddTable.end(); it++) {
+    retval = hdfsWrite(fs, file, &(it->second.Address), sizeof(uintptr_t));
+    if(retval < 0) {
+      DP("Couldn't write address table!\n%s", hdfsGetLastError());
+      return OFFLOAD_FAIL;
+    }
+
+    retval = hdfsWrite(fs, file, &(it->second.MapFromFlag), sizeof(uint8_t));
+    if (retval < 0) {
+      DP("Couldn't write address table!\n%s", hdfsGetLastError());
+      return OFFLOAD_FAIL;
+    }
+
+    retval = hdfsWrite(fs, file, it->second.FilePath.c_str(), it->second.FilePath.length() + 1);
+    if(retval < 0) {
+      DP("Couldn't write address table!\n%s", hdfsGetLastError());
+      return OFFLOAD_FAIL;
+    }
+
+    totalitems++;
+  }
+
+  retval = hdfsCloseFile(fs, file);
+  if(retval < 0) {
+    DP("Error when creating address table in HDFS.\n%s", hdfsGetLastError());
+    return OFFLOAD_FAIL;
+  }
+
+  DP("Wrote address table with %d entries in HDFS.\n", totalitems);
 
   // TODO FIXME: hardcoded execution
   std::string cmd = "spark-submit --class " + spark.Package + " " + spark.JarPath;
