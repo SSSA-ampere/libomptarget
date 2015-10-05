@@ -246,14 +246,13 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
 
   HdfsInfo hdfs {
     reader.Get("HDFS", "HostName", ""),
-    (int) reader.GetInteger("HDFS", "Port", 0),
+    (int) reader.GetInteger("HDFS", "Port", 9000),
     reader.Get("HDFS", "User", ""),
     reader.Get("HDFS", "WorkingDir", ""),
     1,
   };
 
   if (!hdfs.ServAddress.compare("") ||
-      (hdfs.ServPort == 0) ||
       !hdfs.UserName.compare("")) {
     DP("Invalid values in 'cloud_rtl.ini' for HDFS!");
     return OFFLOAD_FAIL;
@@ -276,6 +275,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   hdfsBuilderSetUserName(builder, hdfs.UserName.c_str());
   hdfsFS fs = hdfsBuilderConnect(builder);
   if(fs == NULL) {
+    DP("Connection problem with HDFS cluster. Check your configuration in 'cloud_rtl.ini'.\n");
     return OFFLOAD_FAIL;
   }
 
@@ -294,10 +294,10 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
 
   SparkInfo spark {
     reader.Get("Spark", "HostName", ""),
-    (int) reader.GetInteger("Spark", "Port", 0),
+    (int) reader.GetInteger("Spark", "Port", 7077),
     reader.Get("Spark", "User", ""),
-    reader.Get("Spark", "Package", ""),
-    reader.Get("Spark", "JarPath", ""),
+    reader.Get("Spark", "Package", "org.llvm.openmp.OmpKernel"),
+    reader.Get("Spark", "JarPath", "target/scala-2.10/test-assembly-0.1.0.jar"),
   };
 
   if (!spark.Package.compare("") ||
