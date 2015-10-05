@@ -561,7 +561,8 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   // Spark job entry point
   cmd += " --class " + spark.Package;
 
-  if(!spark.ServAddress.empty()) {
+  if(!spark.ServAddress.empty() && hdfs.ServAddress.find("local") == std::string::npos) {
+    // Run Spark in remote cluster
     cmd += " --master ";
     if (spark.ServAddress.find("://") == std::string::npos) {
       cmd += " spark://";
@@ -571,10 +572,28 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
       cmd.erase(cmd.end() - 1);
     }
     cmd += ":" + std::to_string(spark.ServPort);
-  }
 
-  // Jar file containing the compiled scala code
-  cmd += " " + spark.JarPath;
+    cmd += " --deploy-mode cluster";
+
+    if (hdfs.ServAddress.find("://") == std::string::npos) {
+      cmd += " hdfs://";
+    }
+    cmd += hdfs.ServAddress;
+
+    if (hdfs.ServAddress.back() == '/') {
+      cmd.erase(cmd.end() - 1);
+    }
+
+    cmd += hdfs.WorkingDir;
+    cmd += "test-assembly-0.1.0.jar";
+
+    // Sending file to HDFS as the library to be loaded
+    send_file_to_hdfs(device_id, spark.JarPath.c_str(), "test-assembly-0.1.0.jar");
+  }
+  else {
+    // Run Spark locally
+    cmd += " " + spark.JarPath;
+  }
 
   // Execution arguments pass to the spark kernel
   if (hdfs.ServAddress.find("://") == std::string::npos) {
