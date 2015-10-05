@@ -293,9 +293,9 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   // TODO: Init connection to Apache Spark cluster
 
   SparkInfo spark {
-    reader.Get("HDFS", "HostName", ""),
-    (int) reader.GetInteger("HDFS", "Port", 0),
-    reader.Get("HDFS", "User", ""),
+    reader.Get("Spark", "HostName", ""),
+    (int) reader.GetInteger("Spark", "Port", 0),
+    reader.Get("Spark", "User", ""),
     reader.Get("Spark", "Package", ""),
     reader.Get("Spark", "JarPath", ""),
   };
@@ -556,12 +556,31 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   SparkInfo spark = DeviceInfo.SparkClusters[device_id];
 
   // TODO FIXME: hardcoded execution
-  std::string cmd = "spark-submit --class " + spark.Package + " " + spark.JarPath;
+  std::string cmd = "spark-submit";
 
-  // hardcoded execution arguments
-  if (hdfs.ServAddress.find("://") == std::string::npos) {
-    cmd += " hdfs://" + hdfs.ServAddress;
+  // Spark job entry point
+  cmd += " --class " + spark.Package;
+
+  if(!spark.ServAddress.empty()) {
+    cmd += " --master ";
+    if (spark.ServAddress.find("://") == std::string::npos) {
+      cmd += " spark://";
+    }
+    cmd += spark.ServAddress;
+    if (spark.ServAddress.back() == '/') {
+      cmd.erase(cmd.end() - 1);
+    }
+    cmd += ":" + std::to_string(spark.ServPort);
   }
+
+  // Jar file containing the compiled scala code
+  cmd += " " + spark.JarPath;
+
+  // Execution arguments pass to the spark kernel
+  if (hdfs.ServAddress.find("://") == std::string::npos) {
+    cmd += " hdfs://";
+  }
+  cmd += hdfs.ServAddress;
 
   if (hdfs.ServAddress.back() == '/') {
     cmd.erase(cmd.end() - 1);
