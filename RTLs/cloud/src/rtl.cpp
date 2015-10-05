@@ -125,16 +125,13 @@ public:
 
   ~RTLDeviceInfoTy(){
     // Disconnecting clouds
+    DP ("Disconnecting HDFS server(s)\n");
     for(int i=0; i<HdfsNodes.size(); i++) {
-      if(HdfsNodes[i]) {
-        int err = hdfsDisconnect(HdfsNodes[i]);
-        if (err != 0) {
-          DP ("Error when disconnecting HDFS server\n");
-        }
+      int ret = hdfsDisconnect(HdfsNodes[i]);
+      if (ret != 0) {
+        DP ("Error with HDFS server %d\n", i);
       }
     }
-
-    // TODO: clear map of addresses
   }
 
 };
