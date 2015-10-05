@@ -157,7 +157,7 @@ int _cloud_spark_create_program() {
   return 0;
 }
 
-int32_t send_file_to_hdfs(int32_t device_id, char *filename, char *tgtfilename) {
+int32_t send_file_to_hdfs(int32_t device_id, const char *filename, const char *tgtfilename) {
   DP("Submitting file for device %d\n", device_id);
 
   hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
