@@ -297,7 +297,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     (int) reader.GetInteger("Spark", "Port", 7077),
     reader.Get("Spark", "User", ""),
     reader.Get("Spark", "Package", "org.llvm.openmp.OmpKernel"),
-    reader.Get("Spark", "JarPath", "target/scala-2.10/test-assembly-0.1.0.jar"),
+    reader.Get("Spark", "JarPath", "target/scala-2.11/test-assembly-0.1.0.jar"),
   };
 
   if (!spark.Package.compare("") ||
