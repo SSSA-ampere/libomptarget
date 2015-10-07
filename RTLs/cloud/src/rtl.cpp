@@ -67,6 +67,11 @@ struct SparkInfo{
   std::string JarPath;
 };
 
+#define DEFAULT_HDFS_PORT 9000
+#define DEFAULT_SPARK_PORT 7077
+#define DEFAULT_SPARK_MODE "client"
+#define DEFAULT_SPARK_PACKAGE "org.llvm.openmp.OmpKernel"
+#define DEFAULT_SPARK_JARPATH "target/scala-2.11/test-assembly-0.1.0.jar"
 
 /// Keep entries table per device
 struct FuncOrGblEntryTy{
@@ -247,7 +252,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
 
   HdfsInfo hdfs {
     reader.Get("HDFS", "HostName", ""),
-    (int) reader.GetInteger("HDFS", "Port", 9000),
+    (int) reader.GetInteger("HDFS", "Port", DEFAULT_HDFS_PORT),
     reader.Get("HDFS", "User", ""),
     reader.Get("HDFS", "WorkingDir", ""),
     1,
@@ -291,11 +296,10 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     }
   }
 
-
-  // TODO: Init connection to Apache Spark cluster
+  // TODO: Check connection to Apache Spark cluster
 
   SparkMode mode;
-  std::string smode = reader.Get("Spark", "Mode", "client");
+  std::string smode = reader.Get("Spark", "Mode", DEFAULT_SPARK_MODE);
   if(smode == "client") {
     mode = SparkMode::client;
   } else if (smode == "cluster") {
@@ -306,11 +310,11 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
 
   SparkInfo spark {
     reader.Get("Spark", "HostName", ""),
-    (int) reader.GetInteger("Spark", "Port", 7077),
+    (int) reader.GetInteger("Spark", "Port", DEFAULT_SPARK_PORT),
     mode,
     reader.Get("Spark", "User", ""),
-    reader.Get("Spark", "Package", "org.llvm.openmp.OmpKernel"),
-    reader.Get("Spark", "JarPath", "target/scala-2.11/test-assembly-0.1.0.jar"),
+    reader.Get("Spark", "Package", DEFAULT_SPARK_PACKAGE),
+    reader.Get("Spark", "JarPath", DEFAULT_SPARK_JARPATH),
   };
 
   if (spark.Mode == SparkMode::invalid ||
