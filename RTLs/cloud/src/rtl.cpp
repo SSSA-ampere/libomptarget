@@ -47,6 +47,7 @@ struct DynLibTy {
 #define GETNAME(name) GETNAME2(name)
 #define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL",__VA_ARGS__)
 
+
 struct HdfsInfo{
   std::string ServAddress;
   int ServPort;
@@ -55,9 +56,12 @@ struct HdfsInfo{
   uintptr_t currAddr;
 };
 
+enum SparkMode { client, cluster, invalid };
+
 struct SparkInfo{
   std::string ServAddress;
   int ServPort;
+  SparkMode Mode;
   std::string UserName;
   std::string Package;
   std::string JarPath;
@@ -287,17 +291,30 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     }
   }
 
+
   // TODO: Init connection to Apache Spark cluster
+
+  SparkMode mode;
+  std::string smode = reader.Get("Spark", "Mode", "client");
+  if(smode == "client") {
+    mode = SparkMode::client;
+  } else if (smode == "cluster") {
+    mode = SparkMode::cluster;
+  } else {
+    mode = SparkMode::invalid;
+  }
 
   SparkInfo spark {
     reader.Get("Spark", "HostName", ""),
     (int) reader.GetInteger("Spark", "Port", 7077),
+    mode,
     reader.Get("Spark", "User", ""),
     reader.Get("Spark", "Package", "org.llvm.openmp.OmpKernel"),
     reader.Get("Spark", "JarPath", "target/scala-2.11/test-assembly-0.1.0.jar"),
   };
 
-  if (!spark.Package.compare("") ||
+  if (spark.Mode == SparkMode::invalid ||
+      !spark.Package.compare("") ||
       !spark.JarPath.compare("")) {
     DP("Invalid values in 'cloud_rtl.ini' for Spark!");
     return OFFLOAD_FAIL;
@@ -558,7 +575,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   // Spark job entry point
   cmd += " --class " + spark.Package;
 
-  if(!spark.ServAddress.empty() && hdfs.ServAddress.find("local") == std::string::npos) {
+  if(spark.Mode == SparkMode::cluster) {
     // Run Spark in remote cluster
     cmd += " --master ";
     if (spark.ServAddress.find("://") == std::string::npos) {
