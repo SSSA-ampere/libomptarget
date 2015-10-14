@@ -324,9 +324,9 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     return OFFLOAD_FAIL;
   }
 
-  DP("Spark HostName: '%s' - Port: '%d' - User: '%s' - WorkingDir: '%s'\n",
-     spark.ServAddress.c_str(), spark.ServPort, spark.UserName.c_str(),
-     hdfs.WorkingDir.c_str());
+  DP("Spark HostName: '%s' - Port: '%d' - User: '%s' - Mode: %s\n",
+     spark.ServAddress.c_str(), spark.ServPort, spark.UserName.c_str(), smode.c_str());
+  DP("Jar: %s - Class: %s\n", spark.JarPath.c_str(), spark.Package.c_str());
 
   DeviceInfo.HdfsClusters[device_id] = hdfs;
   DeviceInfo.SparkClusters[device_id] = spark;
