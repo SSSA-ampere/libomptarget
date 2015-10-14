@@ -71,7 +71,7 @@ struct SparkInfo{
 #define DEFAULT_SPARK_PORT 7077
 #define DEFAULT_SPARK_MODE "client"
 #define DEFAULT_SPARK_PACKAGE "org.llvm.openmp.OmpKernel"
-#define DEFAULT_SPARK_JARPATH "target/scala-2.11/test-assembly-0.1.0.jar"
+#define DEFAULT_SPARK_JARPATH "target/scala-2.10/test-assembly-0.1.0.jar"
 
 /// Keep entries table per device
 struct FuncOrGblEntryTy{
