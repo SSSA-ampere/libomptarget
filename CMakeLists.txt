@@ -33,7 +33,11 @@ if(CUDA_FOUND)
 endif()
 
 # Allow support for C++11
-add_definitions("-std=c++11")
+if(APPLE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+else()
+    add_definitions("-std=c++11")
+endif()
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     add_definitions(-DOMPTARGET_DEBUG)
