@@ -26,6 +26,10 @@ class CloudInfo(var uri: String, var username: String, var path: String) {
     os.write(data)
     fs.close()
   }
+  
+  def write(name: Integer, data: RDD[Array[Byte]]): Unit = {
+    data.saveAsObjectFile(fullpath+name)
+  }
 
   def read(id: Integer, size: Integer): RDD[Array[Byte]] = {
     sc.binaryRecords(uri + path + id, 4)
