@@ -12,7 +12,7 @@ class CloudInfo(var uri: String, var username: String, var path: String) {
 
   val conf = new SparkConf() //.setAppName("HdfsTest").setMaster("local")
   val sc = new SparkContext(conf)
-  
+
   // Load library containing native kernel
   sc.addFile(fullpath + "libmr.so")
 
