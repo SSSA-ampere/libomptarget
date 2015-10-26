@@ -12,9 +12,11 @@ class CloudInfo(var uri: String, var username: String, var path: String) {
 
   val conf = new SparkConf() //.setAppName("HdfsTest").setMaster("local")
   val sc = new SparkContext(conf)
-  
+
   // Load library containing native kernel
   sc.addFile(fullpath + "libmr.so")
+  //System.load("/home/bernardo.stein/libomptarget.so")
+  //System.load("/home/bernardo.stein/libomp.so")
   System.load(SparkFiles.get("libmr.so"))
 
   def write(name: Integer, data: Array[Byte]): Unit = {
