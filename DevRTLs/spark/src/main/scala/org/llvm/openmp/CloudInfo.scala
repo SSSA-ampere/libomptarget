@@ -15,7 +15,6 @@ class CloudInfo(var uri: String, var username: String, var path: String) {
   
   // Load library containing native kernel
   sc.addFile(fullpath + "libmr.so")
-  System.load(SparkFiles.get("libmr.so"))
 
   def write(name: Integer, data: Array[Byte]): Unit = {
     System.setProperty("HADOOP_USER_NAME", username)
