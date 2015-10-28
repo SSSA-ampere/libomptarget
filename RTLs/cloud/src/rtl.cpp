@@ -12,6 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #include <assert.h>
+#include <chrono>
+#include <thread>
 #include <vector>
 #include <unordered_map>
 #include <iostream>
@@ -30,6 +32,11 @@
 
 #include "omptarget.h"
 #include "INIReader.h"
+
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
+#include "restclient-cpp/restclient.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
@@ -572,6 +579,120 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 {
   HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
   SparkInfo spark = DeviceInfo.SparkClusters[device_id];
+
+  // Creating JSON request
+  // Structure of a request to create a Spark Job:
+  // {
+  //   "action" : "CreateSubmissionRequest",
+  //   "appArgs" : [ "hdfs://10.68.254.1:8020", "bernardo.stein", "/user/bernardo/cloud_test/" ],
+  //   "appResource" : "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar",
+  //   "clientSparkVersion" : "1.4.0",
+  //   "environmentVariables" : {
+  //     "SPARK_SCALA_VERSION" : "2.10",
+  //     "SPARK_HOME" : "/home/bernardo/projects/spark-1.4.0-bin-hadoop2.6",
+  //     "SPARK_ENV_LOADED" : "1"
+  //   },
+  //   "mainClass" : "org.llvm.openmp.OmpKernel",
+  //   "sparkProperties" : {
+  //     "spark.driver.supervise" : "false",
+  //     "spark.master" : "spark://10.68.254.1:6066",
+  //     "spark.app.name" : "org.llvm.openmp.OmpKernel",
+  //     "spark.jars" : "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar"
+  //   }
+  // }
+  DP("Creating JSON structure\n");
+  rapidjson::Document d;
+  d.SetObject();
+  rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
+
+  d.AddMember("action", "CreateSubmissionRequest", allocator);
+
+  rapidjson::Value appArgs;
+  appArgs.SetArray();
+  appArgs.PushBack("hdfs://10.68.254.1:8020", allocator);
+  appArgs.PushBack("bernardo.stein", allocator);
+  appArgs.PushBack("/user/bernardo/cloud_test/", allocator);
+  d.AddMember("appArgs", appArgs, allocator);
+
+  d.AddMember("appResource", "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar", allocator);
+  d.AddMember("clientSparkVersion", "1.5.0", allocator);
+  d.AddMember("mainClass", "org.llvm.openmp.OmpKernel", allocator);
+
+  rapidjson::Value environmentVariables;
+  environmentVariables.SetObject();
+  //environmentVariables.AddMember("SPARK_SCALA_VERSION", "2.10", allocator);
+  //environmentVariables.AddMember("SPARK_HOME", "/home/bernardo/projects/spark-1.4.0-bin-hadoop2.6", allocator);
+  //environmentVariables.AddMember("SPARK_ENV_LOADED", "1", allocator);
+  d.AddMember("environmentVariables", environmentVariables, allocator);
+
+  rapidjson::Value sparkProperties;
+  sparkProperties.SetObject();
+  sparkProperties.AddMember("spark.driver.supervise", "false", allocator);
+  sparkProperties.AddMember("spark.master", "spark://10.68.254.1:6066", allocator);
+  sparkProperties.AddMember("spark.app.name", "org.llvm.openmp.OmpKernel", allocator);
+  sparkProperties.AddMember("spark.jars", "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar", allocator);
+  d.AddMember("sparkProperties", sparkProperties, allocator);
+
+  rapidjson::StringBuffer buffer;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+  d.Accept(writer);
+
+  RestClient::response r = RestClient::post("http://10.68.254.1:6066/v1/submissions/create", "text/json", buffer.GetString());
+  std::string driverid = "";
+
+  if (r.code == 200) {
+    rapidjson::Document answer;
+    answer.Parse(r.body.c_str());
+
+    assert(answer.IsObject());
+    assert(answer.HasMember("success"));
+
+    if (!answer["success"].GetBool()) {
+      DP("Something bad happened when posting request.\n");
+      return OFFLOAD_FAIL;
+    }
+
+    driverid = std::string(answer["submissionId"].GetString());
+  } else {
+    DP("Got response %d from REST server\n", r.code);
+    DP("Answer: %s\n", r.body.c_str());
+
+    return OFFLOAD_FAIL;
+  }
+
+  do {
+    // Now polling the REST server until we get a good result
+    DP("Requesting result from REST server\n");
+    r = RestClient::get("http://10.68.254.1:6066/v1/submissions/status/" + driverid);
+
+    if (r.code == 200) {
+      // Check if finished
+      rapidjson::Document answer;
+      answer.Parse(r.body.c_str());
+
+      assert(answer.IsObject());
+      assert(answer.HasMember("driverState"));
+      assert(answer.HasMember("success"));
+
+      if (!strcmp(answer["driverState"].GetString(), "RUNNING")) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        continue;
+      } else {
+        if (!strcmp(answer["driverState"].GetString(), "FINISHED") && answer["success"].GetBool()) {
+          return OFFLOAD_SUCCESS;
+        } else {
+          return OFFLOAD_FAIL;
+        }
+      }
+    } else {
+      DP("Got response %d from REST server when polling\n", r.code);
+      DP("Answer: %s\n", r.body.c_str());
+
+      return OFFLOAD_FAIL;
+    }
+  } while (true);
+
+  return OFFLOAD_FAIL;
 
   // TODO FIXME: hardcoded execution
   std::string cmd = "spark-submit";
