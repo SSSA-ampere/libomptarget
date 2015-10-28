@@ -15,9 +15,6 @@ class CloudInfo(var uri: String, var username: String, var path: String) {
 
   // Load library containing native kernel
   sc.addFile(fullpath + "libmr.so")
-  //System.load("/home/bernardo.stein/libomptarget.so")
-  //System.load("/home/bernardo.stein/libomp.so")
-  System.load(SparkFiles.get("libmr.so"))
 
   def write(name: Integer, data: Array[Byte]): Unit = {
     System.setProperty("HADOOP_USER_NAME", username)
@@ -28,6 +25,10 @@ class CloudInfo(var uri: String, var username: String, var path: String) {
     val os = fs.create(filepath)
     os.write(data)
     fs.close()
+  }
+  
+  def write(name: Integer, data: RDD[Array[Byte]]): Unit = {
+    data.saveAsObjectFile(fullpath+name)
   }
 
   def read(id: Integer, size: Integer): RDD[Array[Byte]] = {
