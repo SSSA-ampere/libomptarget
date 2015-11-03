@@ -72,6 +72,7 @@ struct SparkInfo{
   std::string UserName;
   std::string Package;
   std::string JarPath;
+  int PollInterval;
 };
 
 #define DEFAULT_HDFS_PORT 9000
@@ -79,6 +80,7 @@ struct SparkInfo{
 #define DEFAULT_SPARK_MODE "client"
 #define DEFAULT_SPARK_PACKAGE "org.llvm.openmp.OmpKernel"
 #define DEFAULT_SPARK_JARPATH "target/scala-2.10/test-assembly-0.1.0.jar"
+#define DEFAULT_SPARK_POLLINTERVAL 300
 
 /// Keep entries table per device
 struct FuncOrGblEntryTy{
@@ -322,6 +324,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     reader.Get("Spark", "User", ""),
     reader.Get("Spark", "Package", DEFAULT_SPARK_PACKAGE),
     reader.Get("Spark", "JarPath", DEFAULT_SPARK_JARPATH),
+    (int) reader.GetInteger("Spark", "PollInterval", DEFAULT_SPARK_POLLINTERVAL),
   };
 
   if (spark.Mode == SparkMode::invalid ||
@@ -600,6 +603,54 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   //     "spark.jars" : "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar"
   //   }
   // }
+  // TODO: Maybe move those string constructions to the init functions
+  std::string hdfsAddress = "";
+  std::string hdfsResource = "";
+  std::string sparkAddress = "";
+  std::string sparkRESTAddress = "";
+
+  if (hdfs.ServAddress.find("://") == std::string::npos) {
+    hdfsAddress += "hdfs://";
+  }
+
+  hdfsAddress += hdfs.ServAddress;
+
+  if (hdfs.ServAddress.back() == '/') {
+    hdfsAddress.erase(hdfsAddress.end() - 1);
+  }
+
+  hdfsResource = hdfsAddress;
+
+  hdfsAddress += ":";
+  hdfsAddress += std::to_string(hdfs.ServPort);
+
+  hdfsResource += hdfs.WorkingDir;
+  if (hdfsResource.back() != '/') {
+    hdfsResource += "/";
+  }
+  hdfsResource += "test-assembly-0.1.0.jar";
+
+  sparkRESTAddress += "http://";
+
+  if (spark.ServAddress.find("://") == std::string::npos) {
+    sparkAddress += "spark://";
+    sparkRESTAddress += spark.ServAddress;
+  } else {
+    sparkRESTAddress += spark.ServAddress.substr(8);
+  }
+
+  sparkAddress += spark.ServAddress;
+
+  if (spark.ServAddress.back() == '/') {
+    sparkAddress.erase(sparkAddress.end() - 1);
+    sparkRESTAddress.erase(sparkRESTAddress.end() - 1);
+  }
+  sparkAddress += ":" + std::to_string(spark.ServPort);
+  sparkRESTAddress += ":" + std::to_string(spark.ServPort);
+
+  // Sending file to HDFS as the library to be loaded
+  send_file_to_hdfs(device_id, spark.JarPath.c_str(), "test-assembly-0.1.0.jar");
+
   DP("Creating JSON structure\n");
   rapidjson::Document d;
   d.SetObject();
@@ -609,35 +660,32 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 
   rapidjson::Value appArgs;
   appArgs.SetArray();
-  appArgs.PushBack("hdfs://10.68.254.1:8020", allocator);
-  appArgs.PushBack("bernardo.stein", allocator);
-  appArgs.PushBack("/user/bernardo/cloud_test/", allocator);
+  appArgs.PushBack(rapidjson::Value(hdfsAddress.c_str(), allocator), allocator);
+  appArgs.PushBack(rapidjson::Value(hdfs.UserName.c_str(), allocator), allocator);
+  appArgs.PushBack(rapidjson::Value(hdfs.WorkingDir.c_str(), allocator), allocator);
   d.AddMember("appArgs", appArgs, allocator);
 
-  d.AddMember("appResource", "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar", allocator);
+  d.AddMember("appResource", rapidjson::Value(hdfsResource.c_str(), allocator), allocator);
   d.AddMember("clientSparkVersion", "1.5.0", allocator);
-  d.AddMember("mainClass", "org.llvm.openmp.OmpKernel", allocator);
+  d.AddMember("mainClass", rapidjson::Value(spark.Package.c_str(), allocator), allocator);
 
   rapidjson::Value environmentVariables;
   environmentVariables.SetObject();
-  //environmentVariables.AddMember("SPARK_SCALA_VERSION", "2.10", allocator);
-  //environmentVariables.AddMember("SPARK_HOME", "/home/bernardo/projects/spark-1.4.0-bin-hadoop2.6", allocator);
-  //environmentVariables.AddMember("SPARK_ENV_LOADED", "1", allocator);
   d.AddMember("environmentVariables", environmentVariables, allocator);
 
   rapidjson::Value sparkProperties;
   sparkProperties.SetObject();
   sparkProperties.AddMember("spark.driver.supervise", "false", allocator);
-  sparkProperties.AddMember("spark.master", "spark://10.68.254.1:6066", allocator);
-  sparkProperties.AddMember("spark.app.name", "org.llvm.openmp.OmpKernel", allocator);
-  sparkProperties.AddMember("spark.jars", "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar", allocator);
+  sparkProperties.AddMember("spark.master", rapidjson::Value(sparkAddress.c_str(), allocator), allocator);
+  sparkProperties.AddMember("spark.app.name", rapidjson::Value(spark.Package.c_str(), allocator), allocator);
+  sparkProperties.AddMember("spark.jars", rapidjson::Value(hdfsResource.c_str(), allocator), allocator);
   d.AddMember("sparkProperties", sparkProperties, allocator);
 
   rapidjson::StringBuffer buffer;
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
   d.Accept(writer);
 
-  RestClient::response r = RestClient::post("http://10.68.254.1:6066/v1/submissions/create", "text/json", buffer.GetString());
+  RestClient::response r = RestClient::post(sparkRESTAddress + "/v1/submissions/create", "text/json", buffer.GetString());
   std::string driverid = "";
 
   if (r.code == 200) {
@@ -663,7 +711,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   do {
     // Now polling the REST server until we get a good result
     DP("Requesting result from REST server\n");
-    r = RestClient::get("http://10.68.254.1:6066/v1/submissions/status/" + driverid);
+    r = RestClient::get(sparkRESTAddress + "/v1/submissions/status/" + driverid);
 
     if (r.code == 200) {
       // Check if finished
@@ -675,7 +723,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
       assert(answer.HasMember("success"));
 
       if (!strcmp(answer["driverState"].GetString(), "RUNNING")) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(std::chrono::milliseconds(spark.PollInterval));
         continue;
       } else {
         if (!strcmp(answer["driverState"].GetString(), "FINISHED") && answer["success"].GetBool()) {
@@ -693,82 +741,6 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   } while (true);
 
   return OFFLOAD_FAIL;
-
-  // TODO FIXME: hardcoded execution
-  std::string cmd = "spark-submit";
-
-  // Spark job entry point
-  cmd += " --class " + spark.Package;
-
-  if(spark.Mode == SparkMode::cluster) {
-    // Run Spark in remote cluster
-    cmd += " --master ";
-    if (spark.ServAddress.find("://") == std::string::npos) {
-      cmd += " spark://";
-    }
-    cmd += spark.ServAddress;
-    if (spark.ServAddress.back() == '/') {
-      cmd.erase(cmd.end() - 1);
-    }
-    cmd += ":" + std::to_string(spark.ServPort);
-
-    cmd += " --deploy-mode cluster";
-
-    if (hdfs.ServAddress.find("://") == std::string::npos) {
-      cmd += " hdfs://";
-    }
-    cmd += hdfs.ServAddress;
-
-    if (hdfs.ServAddress.back() == '/') {
-      cmd.erase(cmd.end() - 1);
-    }
-
-    cmd += hdfs.WorkingDir;
-    cmd += "test-assembly-0.1.0.jar";
-
-    // Sending file to HDFS as the library to be loaded
-    send_file_to_hdfs(device_id, spark.JarPath.c_str(), "test-assembly-0.1.0.jar");
-  }
-  else {
-    // Run Spark locally
-    cmd += " " + spark.JarPath;
-  }
-
-  // Execution arguments pass to the spark kernel
-  if (hdfs.ServAddress.find("://") == std::string::npos) {
-    cmd += " hdfs://";
-  }
-  cmd += hdfs.ServAddress;
-
-  if (hdfs.ServAddress.back() == '/') {
-    cmd.erase(cmd.end() - 1);
-  }
-
-  cmd += ":" + std::to_string(hdfs.ServPort);
-  cmd += " " + hdfs.UserName;
-  cmd += " " + hdfs.WorkingDir;
-
-  DP("Executing command: %s\n", cmd.c_str());
-
-  FILE *fp = popen(cmd.c_str(), "r");
-
-  if (fp == NULL) {
-    DP("Failed to start spark job.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  char buf[512] = {0};
-  uint read = 0;
-
-  while ((read = fread(buf, sizeof(char), 511, fp)) == 512) {
-    buf[511] = 0;
-    printf("    %s", buf);
-  }
-
-  buf[read] = 0;
-  printf("    %s", buf);
-
-  return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
