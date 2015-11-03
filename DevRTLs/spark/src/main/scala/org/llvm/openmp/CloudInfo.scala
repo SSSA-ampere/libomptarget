@@ -30,9 +30,17 @@ class CloudInfo(var uri: String, var username: String, var path: String) {
   def write(name: Integer, data: RDD[Array[Byte]]): Unit = {
     data.saveAsObjectFile(fullpath+name)
   }
+  
+  def indexedWrite(name: Integer, data: RDD[(Long, Array[Byte])]): Unit = {
+    write(name, data.sortByKey(true).values)
+  }
 
   def read(id: Integer, size: Integer): RDD[Array[Byte]] = {
     sc.binaryRecords(uri + path + id, 4)
+  }
+  
+  def indexedRead(id: Integer, size: Integer): RDD[(Long, Array[Byte])] = {
+    read(id, size).zipWithIndex().map{case (k,v) => (v,k)}
   }
 
   def fullpath = {
