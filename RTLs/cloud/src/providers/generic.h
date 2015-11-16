@@ -1,3 +1,8 @@
+#ifndef _INCLUDE_GENERIC_H_
+#define _INCLUDE_GENERIC_H_
+
+#include "../rtl.h"
+
 class GenericProvider {
   private:
     hdfsFS fs;
@@ -7,8 +12,9 @@ class GenericProvider {
   public:
     GenericProvider(ResourceInfo resources) {
       fs = resources.FS;
-      info = resources.FSInfo;
-      currAddr = 0;
+      hdfs = resources.HDFSInfo;
+      spark = resources.Spark;
+      currAddr = 1;
     }
 
     int32_t send_file(const char *filename, const char *tgtfilename);
@@ -18,3 +24,5 @@ class GenericProvider {
     int32_t data_delete(void *tgt_ptr, int32_t id);
     int32_t submit_job();
 };
+
+#endif

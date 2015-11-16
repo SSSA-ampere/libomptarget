@@ -1,11 +1,26 @@
 #include <hdfs.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
+#include "omptarget.h"
+#include "../rtl.h"
 #include "generic.h"
 
-int32_t GenericProvider::send_file(const char *filename, const char *tgtfilename) {
-  DP("Generic Provider: submitting file %s as %s\n", filename, tgtfilename);
+#ifndef TARGET_NAME
+#define TARGET_NAME Cloud
+#endif
 
-  hdfsFile file = hdfsOpenFile(fs, tgtfilename, O_WRONLY, 0, 0, 0);
+#define GETNAME2(name) #name
+#define GETNAME(name) GETNAME2(name)
+#define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Generic Provider:", __VA_ARGS__)
+
+int32_t GenericProvider::send_file(const char *filename, const char *tgtfilename) {
+  std::string final_name = hdfs.WorkingDir + std::string(tgtfilename);
+
+  DP("submitting file %s as %s\n", filename, final_name.c_str());
+
+  hdfsFile file = hdfsOpenFile(fs, final_name.c_str(), O_WRONLY, 0, 0, 0);
 
   if (file == NULL) {
     DP("Opening file in HDFS failed.\n%s", hdfsGetLastError());
@@ -74,7 +89,7 @@ int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
 
   // Since we now need the hdfs file, we create it here
   std::string filename = hdfs.WorkingDir + std::to_string(id);
-  DP("Submitting data to file %s\n", filename);
+  DP("Submitting data to file %s\n", filename.c_str());
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
 
@@ -176,7 +191,7 @@ int32_t GenericProvider::submit_job() {
     cmd += "test-assembly-0.1.0.jar";
 
     // Sending file to HDFS as the library to be loaded
-    send_file_to_hdfs(device_id, spark.JarPath.c_str(), "test-assembly-0.1.0.jar");
+    send_file(spark.JarPath.c_str(), "test-assembly-0.1.0.jar");
   }
   else {
     // Run Spark locally

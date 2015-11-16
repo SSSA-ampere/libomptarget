@@ -31,6 +31,7 @@
 #include <inttypes.h>
 
 #include "providers/generic.h"
+#include "rtl.h"
 
 #include "omptarget.h"
 #include "INIReader.h"
@@ -44,145 +45,82 @@
 #define TARGET_NAME Cloud
 #endif
 
-#define NUMBER_OF_DEVICES 1
-
-/// Array of Dynamic libraries loaded for this target
-struct DynLibTy {
-  char *FileName;
-  void* Handle;
-};
-
 #define GETNAME2(name) #name
 #define GETNAME(name) GETNAME2(name)
 #define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL",__VA_ARGS__)
 
-
-struct ResourceInfo {
-  struct HdfsInfo hdfs;
-  hdfsFS fs;
-  struct SparkInfo spark;
-  struct ProxyInfo proxy;
-};
-
-
-struct HdfsInfo{
-  std::string ServAddress;
-  int ServPort;
-  std::string UserName;
-  std::string WorkingDir;
-  uintptr_t currAddr;
-};
-
-enum SparkMode { client, cluster, invalid };
-
-struct SparkInfo{
-  std::string ServAddress;
-  int ServPort;
-  SparkMode Mode;
-  std::string UserName;
-  std::string Package;
-  std::string JarPath;
-  int PollInterval;
-};
-
-struct ProxyInfo {
-  std::string HostName;
-  int Port;
-  std::string Type;
-};
-
-#define DEFAULT_HDFS_PORT 9000
-#define DEFAULT_SPARK_PORT 7077
-#define DEFAULT_SPARK_MODE "client"
-#define DEFAULT_SPARK_PACKAGE "org.llvm.openmp.OmpKernel"
-#define DEFAULT_SPARK_JARPATH "target/scala-2.10/test-assembly-0.1.0.jar"
-#define DEFAULT_SPARK_POLLINTERVAL 300
-#define DEFAULT_PROXY_HOSTNAME ""
-
-/// Keep entries table per device
-struct FuncOrGblEntryTy{
-  __tgt_target_table Table;
-};
-
-/// Class containing all the device information
-class RTLDeviceInfoTy{
-  std::vector<FuncOrGblEntryTy> FuncGblEntries;
-
-public:
-  int NumberOfDevices;
-
-  std::vector<HdfsInfo> HdfsClusters;
-  std::vector<SparkInfo> SparkClusters;
-  ProxyInfo ProxyOptions;
-
-  std::vector<hdfsFS> HdfsNodes;
-
-  std::vector<GenericProvider*> Providers;
-
-  // Record entry point associated with device
-  void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin, __tgt_offload_entry *end){
-    assert( device_id < FuncGblEntries.size() && "Unexpected device id!");
-    FuncOrGblEntryTy &E = FuncGblEntries[device_id];
-
-    E.Table.EntriesBegin = begin;
-    E.Table.EntriesEnd = end;
-  }
-
-  // Return true if the entry is associated with device
-  bool findOffloadEntry(int32_t device_id, void *addr){
-    assert( device_id < FuncGblEntries.size() && "Unexpected device id!");
-    FuncOrGblEntryTy &E = FuncGblEntries[device_id];
-
-    for(__tgt_offload_entry *i= E.Table.EntriesBegin,
-                            *e= E.Table.EntriesEnd; i<e; ++i){
-      if(i->addr == addr)
-        return true;
-    }
-
-    return false;
-  }
-
-  // Return the pointer to the target entries table
-  __tgt_target_table *getOffloadEntriesTable(int32_t device_id){
-    assert( device_id < FuncGblEntries.size() && "Unexpected device id!");
-    FuncOrGblEntryTy &E = FuncGblEntries[device_id];
-
-    return &E.Table;
-  }
-
-  RTLDeviceInfoTy(){
-    NumberOfDevices = 1;
-
-    // TODO: Detect the number of clouds available
-
-    FuncGblEntries.resize(NumberOfDevices);
-    HdfsClusters.resize(NumberOfDevices);
-    SparkClusters.resize(NumberOfDevices);
-    HdfsNodes.resize(NumberOfDevices);
-    Providers.resize(NumberOfDevices);
-  }
-
-  ~RTLDeviceInfoTy(){
-    // Disconnecting clouds
-    DP ("Disconnecting HDFS server(s)\n");
-    for(int i=0; i<HdfsNodes.size(); i++) {
-      int ret = hdfsDisconnect(HdfsNodes[i]);
-      if (ret != 0) {
-        DP ("Error with HDFS server %d\n", i);
-      }
-    }
-  }
-
-};
+#define NUMBER_OF_DEVICES 1
 
 static RTLDeviceInfoTy DeviceInfo;
 
+RTLDeviceInfoTy::RTLDeviceInfoTy() {
+  NumberOfDevices = 1;
+
+  // TODO: Detect the number of clouds available
+  FuncGblEntries.resize(NumberOfDevices);
+  HdfsClusters.resize(NumberOfDevices);
+  SparkClusters.resize(NumberOfDevices);
+  HdfsNodes.resize(NumberOfDevices);
+  Providers.resize(NumberOfDevices);
+
+  // Parsing proxy configuration, if exists
+  INIReader reader(DEFAULT_CLOUD_RTL_CONF_FILE);
+
+  if (reader.ParseError() < 0) {
+    DP("Couldn't find '%s'!", DEFAULT_CLOUD_RTL_CONF_FILE);
+  } else {
+    ProxyInfo proxy {
+      reader.Get("Proxy", "HostName", DEFAULT_PROXY_HOSTNAME),
+      (int) reader.GetInteger("Proxy", "Port", DEFAULT_PROXY_PORT),
+      reader.Get("Proxy", "Type", DEFAULT_PROXY_TYPE),
+    };
+
+    ProxyOptions = proxy;
+  }
+}
+
+RTLDeviceInfoTy::~RTLDeviceInfoTy(){
+  // Disconnecting clouds
+  DP ("Disconnecting HDFS server(s)\n");
+  for(int i=0; i<HdfsNodes.size(); i++) {
+    int ret = hdfsDisconnect(HdfsNodes[i]);
+    if (ret != 0) {
+      DP ("Error with HDFS server %d\n", i);
+    }
+  }
+}
+
+void RTLDeviceInfoTy::createOffloadTable(int32_t device_id, __tgt_offload_entry *begin, __tgt_offload_entry *end){
+  assert( device_id < FuncGblEntries.size() && "Unexpected device id!");
+  FuncOrGblEntryTy &E = FuncGblEntries[device_id];
+
+  E.Table.EntriesBegin = begin;
+  E.Table.EntriesEnd = end;
+}
+
+bool RTLDeviceInfoTy::findOffloadEntry(int32_t device_id, void *addr){
+  assert( device_id < FuncGblEntries.size() && "Unexpected device id!");
+  FuncOrGblEntryTy &E = FuncGblEntries[device_id];
+
+  for(__tgt_offload_entry *i= E.Table.EntriesBegin,
+                          *e= E.Table.EntriesEnd; i<e; ++i){
+    if(i->addr == addr)
+      return true;
+  }
+
+  return false;
+}
+
+__tgt_target_table *RTLDeviceInfoTy::getOffloadEntriesTable(int32_t device_id){
+  assert( device_id < FuncGblEntries.size() && "Unexpected device id!");
+  FuncOrGblEntryTy &E = FuncGblEntries[device_id];
+
+  return &E.Table;
+}
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-
 
 int _cloud_spark_create_program() {
   // 1/ Generate scala code (with template)
@@ -190,71 +128,6 @@ int _cloud_spark_create_program() {
   // 3/ Generate native kernel code (map function)
   // 4/ Compile
   // 5/ Upload to HDFS
-  return 0;
-}
-
-int32_t send_file_to_hdfs(int32_t device_id, const char *filename, const char *tgtfilename) {
-  DP("Submitting file for device %d\n", device_id);
-
-  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
-
-  // TODO: Assuming the target runs Linux
-  std::string stgtfilename(tgtfilename);
-  std::string libraryFile = (hdfs.WorkingDir + stgtfilename);
-
-
-  DP("Writing data in file '%s'\n", libraryFile.c_str());
-
-  hdfsFile file = hdfsOpenFile(fs, libraryFile.c_str(), O_WRONLY, 0, 0, 0);
-  if(file == NULL) {
-    DP("Opening failed.\n%s", hdfsGetLastError());
-    return -1;
-  }
-
-  std::ifstream hstfile(filename, std::ios::in|std::ios::binary);
-
-  if (!hstfile.is_open()) {
-    DP("Opening host file %s failed.", filename);
-    hdfsCloseFile(fs, file);
-    return -1;
-  }
-
-  DP("Reading...\n");
-
-  // TODO: Malloc this buffer
-  char buffer[4096] = {0};
-  int retval;
-
-  while (true) {
-    hstfile.read(buffer, 4096);
-
-    if (!hstfile.good()) {
-      if (!hstfile.eof()) {
-        break;
-      }
-    }
-
-    retval = hdfsWrite(fs, file, buffer, hstfile.gcount());
-    if(retval < 0) {
-      DP("Writing failed.\n%s", hdfsGetLastError());
-      hdfsCloseFile(fs, file);
-      return -1;
-    }
-
-    if (hstfile.eof()) {
-      break;
-    }
-  }
-
-  hstfile.close();
-
-  retval = hdfsCloseFile(fs, file);
-  if(retval < 0) {
-    DP("Closing failed.\n%s", hdfsGetLastError());
-    return -1;
-  }
-
   return 0;
 }
 
@@ -270,13 +143,13 @@ int __tgt_rtl_number_of_devices(){
 int32_t __tgt_rtl_init_device(int32_t device_id){
   int retval;
 
-  DP ("Getting device %d\n", device_id);
+  DP("Initializing device %d\n", device_id);
 
-  // Parsing configuration
-  INIReader reader("cloud_rtl.ini");
+  // Parsing configurations
+  INIReader reader(DEFAULT_CLOUD_RTL_CONF_FILE);
 
   if (reader.ParseError() < 0) {
-    DP("Couldn't find 'cloud_rtl.ini'!");
+    DP("Couldn't find '%s'!", DEFAULT_CLOUD_RTL_CONF_FILE);
     return OFFLOAD_FAIL;
   }
 
@@ -310,7 +183,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   hdfsBuilderSetNameNodePort(builder, hdfs.ServPort);
   hdfsBuilderSetUserName(builder, hdfs.UserName.c_str());
   hdfsFS fs = hdfsBuilderConnect(builder);
-  if(fs == NULL) {
+
+  if (fs == NULL) {
     DP("Connection problem with HDFS cluster. Check your configuration in 'cloud_rtl.ini'.\n");
     return OFFLOAD_FAIL;
   }
@@ -359,16 +233,17 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
      spark.ServAddress.c_str(), spark.ServPort, spark.UserName.c_str(), smode.c_str());
   DP("Jar: %s - Class: %s\n", spark.JarPath.c_str(), spark.Package.c_str());
 
-  // Checking proxy options
-  ProxyInfo proxy {
-    reader.Get("Proxy", "HostName", DEFAULT_PROXY_HOSTNAME),
-    (int) reader.GetInteger("Proxy", "Port", 0),
-    reader.Get("Proxy", "Type", ""),
-  };
-
   DeviceInfo.HdfsClusters[device_id] = hdfs;
   DeviceInfo.SparkClusters[device_id] = spark;
-  DeviceInfo.ProxyOptions = proxy;
+
+  ResourceInfo resources {
+    hdfs,
+    fs,
+    spark,
+    DeviceInfo.ProxyOptions,
+  };
+
+  DeviceInfo.Providers[device_id] = new GenericProvider(resources);
 
   return OFFLOAD_SUCCESS; // success
 }
@@ -457,7 +332,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   DP("Trying to send lib to HDFS\n");
 
   // Sending file to HDFS as the library to be loaded
-  send_file_to_hdfs(device_id, tmp_name, "libmr.so");
+  DeviceInfo.Providers[device_id]->send_file(tmp_name, "libmr.so");
 
   DP("Lib sent to HDFS!\n");
 
@@ -507,288 +382,28 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
 }
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type, int32_t id){
-  // NOTE: we do not create the HDFS file here because we do not want to
-  // waste time creating stuff that we might not need before (there may be
-  // unecessary allocations)
-
-  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
-
-  // Return fake target address
-  return (void *)hdfs.currAddr++;
+  return DeviceInfo.Providers[device_id]->data_alloc(size, type, id);
 }
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id){
-  if(id < 0) {
-    DP("Not need to submit pointer for device %d\n", device_id);
-    return OFFLOAD_SUCCESS;
-  }
-
-  // Since we now need the hdfs file, we create it here
-  DP("Submitting data for device %d\n", device_id);
-
-  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
-  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-
-  std::string filename = hdfs.WorkingDir + std::to_string(id);
-
-  DP("Writing data in file '%s'\n", filename.c_str());
-
-  hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
-  if(file == NULL) {
-    DP("Opening failed.\n%s", hdfsGetLastError());
-    return OFFLOAD_FAIL;
-  }
-
-  int retval = hdfsWrite(fs, file, hst_ptr, size);
-  if(retval < 0) {
-    DP("Writing failed.\n%s", hdfsGetLastError());
-    return OFFLOAD_FAIL;
-  }
-
-  retval = hdfsCloseFile(fs, file);
-  if(retval < 0) {
-    DP("Closing failed.\n%s", hdfsGetLastError());
-    return OFFLOAD_FAIL;
-  }
-
-  return OFFLOAD_SUCCESS;
+  return DeviceInfo.Providers[device_id]->data_submit(tgt_ptr, hst_ptr, size, id);
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id){
-
-  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
-  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-
-  std::string filename = hdfs.WorkingDir + std::to_string(id);
-
-  DP("Reading data from file '%s'\n", filename.c_str());
-
-  hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_RDONLY, 0, 0, 0);
-  if(file == NULL) {
-    DP("Opening failed.\n%s", hdfsGetLastError());
-    return OFFLOAD_FAIL;
-  }
-
-  int retval = hdfsRead(fs, file, hst_ptr, size);
-  if(retval < 0) {
-    DP("Reading failed.\n%s", hdfsGetLastError());
-    return OFFLOAD_FAIL;
-  }
-
-  retval = hdfsCloseFile(fs, file);
-  if(retval < 0) {
-    DP("Closing failed.\n%s", hdfsGetLastError());
-    return OFFLOAD_FAIL;
-  }
-
-  return OFFLOAD_SUCCESS;
+  return DeviceInfo.Providers[device_id]->data_retrieve(hst_ptr, tgt_ptr, size, id);
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr, int32_t id){
-  if(id < 0) {
-    DP("No file to delete\n");
-    return OFFLOAD_SUCCESS;
-  }
-
-  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
-  hdfsFS &fs = DeviceInfo.HdfsNodes[device_id];
-
-  std::string filename = hdfs.WorkingDir + std::to_string(id);
-
-  DP("Deleting file '%s'\n", filename.c_str());
-
-  int retval = hdfsDelete(fs, filename.c_str(), 0);
-  if(retval < 0) {
-    DP("Deleting file failed.\n%s", hdfsGetLastError());
-    return OFFLOAD_FAIL;
-  }
-
-  return OFFLOAD_SUCCESS;
+  return DeviceInfo.Providers[device_id]->data_delete(tgt_ptr, id);
 }
 
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
-   void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit)
-{
-  HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
-  SparkInfo spark = DeviceInfo.SparkClusters[device_id];
-  ProxyInfo proxy = DeviceInfo.ProxyOptions;
-
-  // Checking if proxy option is set. If it is, set it already
-  if (proxy.HostName != "") {
-    std::string uri = proxy.HostName;
-
-    if (uri.back() == '/') {
-      uri.erase(uri.end() - 1);
-    }
-
-    uri += ":" + std::to_string(proxy.Port);
-
-    RestClient::setProxy(uri, proxy.Type);
-  }
-
-  // Creating JSON request
-  // Structure of a request to create a Spark Job:
-  // {
-  //   "action" : "CreateSubmissionRequest",
-  //   "appArgs" : [ "hdfs://10.68.254.1:8020", "bernardo.stein", "/user/bernardo/cloud_test/" ],
-  //   "appResource" : "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar",
-  //   "clientSparkVersion" : "1.4.0",
-  //   "environmentVariables" : {
-  //     "SPARK_SCALA_VERSION" : "2.10",
-  //     "SPARK_HOME" : "/home/bernardo/projects/spark-1.4.0-bin-hadoop2.6",
-  //     "SPARK_ENV_LOADED" : "1"
-  //   },
-  //   "mainClass" : "org.llvm.openmp.OmpKernel",
-  //   "sparkProperties" : {
-  //     "spark.driver.supervise" : "false",
-  //     "spark.master" : "spark://10.68.254.1:6066",
-  //     "spark.app.name" : "org.llvm.openmp.OmpKernel",
-  //     "spark.jars" : "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar"
-  //   }
-  // }
-  // TODO: Maybe move those string constructions to the init functions
-  std::string hdfsAddress = "";
-  std::string hdfsResource = "";
-  std::string sparkAddress = "";
-  std::string sparkRESTAddress = "";
-
-  if (hdfs.ServAddress.find("://") == std::string::npos) {
-    hdfsAddress += "hdfs://";
-  }
-
-  hdfsAddress += hdfs.ServAddress;
-
-  if (hdfs.ServAddress.back() == '/') {
-    hdfsAddress.erase(hdfsAddress.end() - 1);
-  }
-
-  hdfsResource = hdfsAddress;
-
-  hdfsAddress += ":";
-  hdfsAddress += std::to_string(hdfs.ServPort);
-
-  hdfsResource += hdfs.WorkingDir;
-  if (hdfsResource.back() != '/') {
-    hdfsResource += "/";
-  }
-  hdfsResource += "test-assembly-0.1.0.jar";
-
-  sparkRESTAddress += "http://";
-
-  if (spark.ServAddress.find("://") == std::string::npos) {
-    sparkAddress += "spark://";
-    sparkRESTAddress += spark.ServAddress;
-  } else {
-    sparkRESTAddress += spark.ServAddress.substr(8);
-  }
-
-  sparkAddress += spark.ServAddress;
-
-  if (spark.ServAddress.back() == '/') {
-    sparkAddress.erase(sparkAddress.end() - 1);
-    sparkRESTAddress.erase(sparkRESTAddress.end() - 1);
-  }
-  sparkAddress += ":" + std::to_string(spark.ServPort);
-  sparkRESTAddress += ":" + std::to_string(spark.ServPort);
-
-  // Sending file to HDFS as the library to be loaded
-  send_file_to_hdfs(device_id, spark.JarPath.c_str(), "test-assembly-0.1.0.jar");
-
-  DP("Creating JSON structure\n");
-  rapidjson::Document d;
-  d.SetObject();
-  rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
-
-  d.AddMember("action", "CreateSubmissionRequest", allocator);
-
-  rapidjson::Value appArgs;
-  appArgs.SetArray();
-  appArgs.PushBack(rapidjson::Value(hdfsAddress.c_str(), allocator), allocator);
-  appArgs.PushBack(rapidjson::Value(hdfs.UserName.c_str(), allocator), allocator);
-  appArgs.PushBack(rapidjson::Value(hdfs.WorkingDir.c_str(), allocator), allocator);
-  d.AddMember("appArgs", appArgs, allocator);
-
-  d.AddMember("appResource", rapidjson::Value(hdfsResource.c_str(), allocator), allocator);
-  d.AddMember("clientSparkVersion", "1.5.0", allocator);
-  d.AddMember("mainClass", rapidjson::Value(spark.Package.c_str(), allocator), allocator);
-
-  rapidjson::Value environmentVariables;
-  environmentVariables.SetObject();
-  d.AddMember("environmentVariables", environmentVariables, allocator);
-
-  rapidjson::Value sparkProperties;
-  sparkProperties.SetObject();
-  sparkProperties.AddMember("spark.driver.supervise", "false", allocator);
-  sparkProperties.AddMember("spark.master", rapidjson::Value(sparkAddress.c_str(), allocator), allocator);
-  sparkProperties.AddMember("spark.app.name", rapidjson::Value(spark.Package.c_str(), allocator), allocator);
-  sparkProperties.AddMember("spark.jars", rapidjson::Value(hdfsResource.c_str(), allocator), allocator);
-  d.AddMember("sparkProperties", sparkProperties, allocator);
-
-  rapidjson::StringBuffer buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  d.Accept(writer);
-
-  RestClient::response r = RestClient::post(sparkRESTAddress + "/v1/submissions/create", "text/json", buffer.GetString());
-  std::string driverid = "";
-
-  if (r.code == 200) {
-    rapidjson::Document answer;
-    answer.Parse(r.body.c_str());
-
-    assert(answer.IsObject());
-    assert(answer.HasMember("success"));
-
-    if (!answer["success"].GetBool()) {
-      DP("Something bad happened when posting request.\n");
-      return OFFLOAD_FAIL;
-    }
-
-    driverid = std::string(answer["submissionId"].GetString());
-  } else {
-    DP("Got response %d from REST server\n", r.code);
-    DP("Answer: %s\n", r.body.c_str());
-
-    return OFFLOAD_FAIL;
-  }
-
-  do {
-    // Now polling the REST server until we get a good result
-    DP("Requesting result from REST server\n");
-    r = RestClient::get(sparkRESTAddress + "/v1/submissions/status/" + driverid);
-
-    if (r.code == 200) {
-      // Check if finished
-      rapidjson::Document answer;
-      answer.Parse(r.body.c_str());
-
-      assert(answer.IsObject());
-      assert(answer.HasMember("driverState"));
-      assert(answer.HasMember("success"));
-
-      if (!strcmp(answer["driverState"].GetString(), "RUNNING")) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(spark.PollInterval));
-        continue;
-      } else {
-        if (!strcmp(answer["driverState"].GetString(), "FINISHED") && answer["success"].GetBool()) {
-          return OFFLOAD_SUCCESS;
-        } else {
-          return OFFLOAD_FAIL;
-        }
-      }
-    } else {
-      DP("Got response %d from REST server when polling\n", r.code);
-      DP("Answer: %s\n", r.body.c_str());
-
-      return OFFLOAD_FAIL;
-    }
-  } while (true);
-
-  return OFFLOAD_FAIL;
+    void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit) {
+  return DeviceInfo.Providers[device_id]->submit_job();
 }
 
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
-  void **tgt_args, int32_t arg_num)
-{
+    void **tgt_args, int32_t arg_num) {
   // use one team and one thread
   return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr,
     tgt_args, arg_num, 1, 1);
