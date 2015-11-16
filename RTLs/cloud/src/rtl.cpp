@@ -30,6 +30,8 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
+#include "providers/generic.h"
+
 #include "omptarget.h"
 #include "INIReader.h"
 
@@ -55,6 +57,14 @@ struct DynLibTy {
 #define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL",__VA_ARGS__)
 
 
+struct ResourceInfo {
+  struct HdfsInfo hdfs;
+  hdfsFS fs;
+  struct SparkInfo spark;
+  struct ProxyInfo proxy;
+};
+
+
 struct HdfsInfo{
   std::string ServAddress;
   int ServPort;
@@ -75,12 +85,19 @@ struct SparkInfo{
   int PollInterval;
 };
 
+struct ProxyInfo {
+  std::string HostName;
+  int Port;
+  std::string Type;
+};
+
 #define DEFAULT_HDFS_PORT 9000
 #define DEFAULT_SPARK_PORT 7077
 #define DEFAULT_SPARK_MODE "client"
 #define DEFAULT_SPARK_PACKAGE "org.llvm.openmp.OmpKernel"
 #define DEFAULT_SPARK_JARPATH "target/scala-2.10/test-assembly-0.1.0.jar"
 #define DEFAULT_SPARK_POLLINTERVAL 300
+#define DEFAULT_PROXY_HOSTNAME ""
 
 /// Keep entries table per device
 struct FuncOrGblEntryTy{
@@ -96,8 +113,11 @@ public:
 
   std::vector<HdfsInfo> HdfsClusters;
   std::vector<SparkInfo> SparkClusters;
+  ProxyInfo ProxyOptions;
 
   std::vector<hdfsFS> HdfsNodes;
+
+  std::vector<GenericProvider*> Providers;
 
   // Record entry point associated with device
   void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin, __tgt_offload_entry *end){
@@ -139,6 +159,7 @@ public:
     HdfsClusters.resize(NumberOfDevices);
     SparkClusters.resize(NumberOfDevices);
     HdfsNodes.resize(NumberOfDevices);
+    Providers.resize(NumberOfDevices);
   }
 
   ~RTLDeviceInfoTy(){
@@ -338,8 +359,16 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
      spark.ServAddress.c_str(), spark.ServPort, spark.UserName.c_str(), smode.c_str());
   DP("Jar: %s - Class: %s\n", spark.JarPath.c_str(), spark.Package.c_str());
 
+  // Checking proxy options
+  ProxyInfo proxy {
+    reader.Get("Proxy", "HostName", DEFAULT_PROXY_HOSTNAME),
+    (int) reader.GetInteger("Proxy", "Port", 0),
+    reader.Get("Proxy", "Type", ""),
+  };
+
   DeviceInfo.HdfsClusters[device_id] = hdfs;
   DeviceInfo.SparkClusters[device_id] = spark;
+  DeviceInfo.ProxyOptions = proxy;
 
   return OFFLOAD_SUCCESS; // success
 }
@@ -582,6 +611,20 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 {
   HdfsInfo hdfs = DeviceInfo.HdfsClusters[device_id];
   SparkInfo spark = DeviceInfo.SparkClusters[device_id];
+  ProxyInfo proxy = DeviceInfo.ProxyOptions;
+
+  // Checking if proxy option is set. If it is, set it already
+  if (proxy.HostName != "") {
+    std::string uri = proxy.HostName;
+
+    if (uri.back() == '/') {
+      uri.erase(uri.end() - 1);
+    }
+
+    uri += ":" + std::to_string(proxy.Port);
+
+    RestClient::setProxy(uri, proxy.Type);
+  }
 
   // Creating JSON request
   // Structure of a request to create a Spark Job:

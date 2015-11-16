@@ -16,10 +16,33 @@
 #include <iostream>
 #include <map>
 
+/** initializing proxy options */
+std::string RestClient::proxyuri = "";
+long RestClient::proxytype = 0;
+void RestClient::setProxy(const std::string& uri, const std::string& type) {
+  if (uri != "") {
+    RestClient::proxyuri = uri;
+
+    if (type == "HTTP") {
+      RestClient::proxytype = CURLPROXY_HTTP;
+    } else if (type == "HTTP_1_0") {
+      RestClient::proxytype = CURLPROXY_HTTP_1_0;
+    } else if (type == "SOCKS4") {
+      RestClient::proxytype = CURLPROXY_SOCKS4;
+    } else if (type == "SOCKS5") {
+      RestClient::proxytype = CURLPROXY_SOCKS5;
+    } else if (type == "SOCKS4A") {
+      RestClient::proxytype = CURLPROXY_SOCKS4A;
+    } else if (type == "SOCKS5_HOSTNAME") {
+      RestClient::proxytype = CURLPROXY_SOCKS5_HOSTNAME;
+    }
+  }
+}
+
 /** initialize user agent string */
 const char* RestClient::user_agent = "restclient-cpp/" VERSION;
 /** initialize authentication variable */
-std::string RestClient::user_pass =  std::string();
+std::string RestClient::user_pass = std::string();
 /** Authentication Methods implementation */
 void RestClient::clearAuth(){
   RestClient::user_pass.clear();
@@ -62,6 +85,10 @@ RestClient::response RestClient::get(const std::string& url, const headermap& he
   curl = curl_easy_init();
   if (curl)
   {
+    if (RestClient::proxyuri.length() > 0) {
+      curl_easy_setopt(curl, CURLOPT_PROXY, RestClient::proxyuri.c_str());
+      curl_easy_setopt(curl, CURLOPT_PROXYTYPE, RestClient::proxytype);
+    }
     /** set basic authentication if present*/
     if(RestClient::user_pass.length()>0){
       curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
@@ -166,6 +193,10 @@ RestClient::response RestClient::post(const std::string& url,
   curl = curl_easy_init();
   if (curl)
   {
+    if (RestClient::proxyuri.length() > 0) {
+      curl_easy_setopt(curl, CURLOPT_PROXY, RestClient::proxyuri.c_str());
+      curl_easy_setopt(curl, CURLOPT_PROXYTYPE, RestClient::proxytype);
+    }
     /** set basic authentication if present*/
     if(RestClient::user_pass.length()>0){
       curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
@@ -281,6 +312,10 @@ RestClient::response RestClient::put(const std::string& url,
   curl = curl_easy_init();
   if (curl)
   {
+    if (RestClient::proxyuri.length() > 0) {
+      curl_easy_setopt(curl, CURLOPT_PROXY, RestClient::proxyuri.c_str());
+      curl_easy_setopt(curl, CURLOPT_PROXYTYPE, RestClient::proxytype);
+    }
     /** set basic authentication if present*/
     if(RestClient::user_pass.length()>0){
       curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
@@ -389,6 +424,10 @@ RestClient::response RestClient::del(const std::string& url,
   curl = curl_easy_init();
   if (curl)
   {
+    if (RestClient::proxyuri.length() > 0) {
+      curl_easy_setopt(curl, CURLOPT_PROXY, RestClient::proxyuri.c_str());
+      curl_easy_setopt(curl, CURLOPT_PROXYTYPE, RestClient::proxytype);
+    }
     /** set basic authentication if present*/
     if(RestClient::user_pass.length()>0){
       curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);

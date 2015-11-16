@@ -37,6 +37,8 @@ class RestClient
     } upload_object;
 
     /** public methods */
+    // Proxy
+    static void setProxy(const std::string& uri, const std::string& proxytype);
     // Auth
     static void clearAuth();
     static void setAuth(const std::string& user,const std::string& password);
@@ -74,6 +76,8 @@ class RestClient
                                 void *userdata);
     static const char* user_agent;
     static std::string user_pass;
+    static std::string proxyuri;
+    static long proxytype;
 
     // trim from start
     static inline std::string &ltrim(std::string &s) {
