@@ -1,6 +1,7 @@
 #ifndef _INCLUDE_GENERIC_H_
 #define _INCLUDE_GENERIC_H_
 
+#include "INIReader.h"
 #include "../rtl.h"
 
 class GenericProvider {
@@ -19,6 +20,7 @@ class GenericProvider {
       currAddr = 1;
     }
 
+    virtual int32_t parse_config(INIReader reader);
     virtual int32_t send_file(const char *filename, const char *tgtfilename);
     virtual void *data_alloc(int64_t size, int32_t type, int32_t id);
     virtual int32_t data_submit(void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id);

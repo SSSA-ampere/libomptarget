@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "INIReader.h"
 #include "omptarget.h"
 #include "../rtl.h"
 #include "generic.h"
@@ -14,6 +15,10 @@
 #define GETNAME2(name) #name
 #define GETNAME(name) GETNAME2(name)
 #define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Generic Provider:", __VA_ARGS__)
+
+int32_t GenericProvider::parse_config(INIReader reader) {
+  return OFFLOAD_SUCCESS;
+}
 
 int32_t GenericProvider::send_file(const char *filename, const char *tgtfilename) {
   std::string final_name = hdfs.WorkingDir + std::string(tgtfilename);
@@ -212,7 +217,7 @@ int32_t GenericProvider::submit_job() {
   cmd += " " + hdfs.UserName;
   cmd += " " + hdfs.WorkingDir;
 
-  if (!execute_command(cmd, true)) {
+  if (!execute_command(cmd.c_str(), true)) {
     return OFFLOAD_FAIL;
   }
 
@@ -220,9 +225,9 @@ int32_t GenericProvider::submit_job() {
 }
 
 int32_t GenericProvider::execute_command(const char *command, bool print_result) {
-  DP("Executing command: %s\n", command;
+  DP("Executing command: %s\n", command);
 
-  FILE *fp = popen(commad, "r");
+  FILE *fp = popen(command, "r");
 
   if (fp == NULL) {
     DP("Failed to execute command.\n");

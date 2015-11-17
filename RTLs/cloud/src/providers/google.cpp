@@ -1,16 +1,31 @@
+#include <hdfs.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "INIReader.h"
+#include "omptarget.h"
+#include "../rtl.h"
 #include "generic.h"
+#include "google.h"
 
-class GoogleProvider : public GenericProvider {
-  private:
-    GoogleInfo ginfo;
-  public:
-    GoogleProvider(ResourceInfo resources) : GenericProvider(resources) {}
+#ifndef TARGET_NAME
+#define TARGET_NAME Cloud
+#endif
 
-    int32_t send_file(const char *filename, const char *tgtfilename);
-    int32_t data_submit(void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id);
-    int32_t data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id);
-    int32_t data_delete(void *tgt_ptr, int32_t id);
-    int32_t submit_job();
+#define GETNAME2(name) #name
+#define GETNAME(name) GETNAME2(name)
+#define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Google Provider:", __VA_ARGS__)
+
+int32_t GoogleProvider::parse_config(INIReader reader) {
+  GoogleInfo info {
+    reader.Get("GoogleProvider", "Bucket", ""),
+    reader.Get("GoogleProvider", "Cluster", ""),
+  };
+
+  ginfo = info;
+
+  return OFFLOAD_SUCCESS;
 }
 
 int32_t GoogleProvider::send_file(const char *filename, const char *tgtfilename) {
@@ -21,7 +36,7 @@ int32_t GoogleProvider::send_file(const char *filename, const char *tgtfilename)
   command += ginfo.Bucket;
   command += hdfs.WorkingDir + std::string(tgtfilename);
 
-  if (!execute_command(command, true)) {
+  if (!execute_command(command.c_str(), true)) {
     return OFFLOAD_FAIL;
   }
 
@@ -73,11 +88,11 @@ int32_t GoogleProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size
   std::string command = "gsutil cp ";
 
   command += ginfo.Bucket;
-  command += hdfs.WorkingDir + std::string(id);
+  command += hdfs.WorkingDir + std::to_string(id);
   command += " ";
   command += std::string(tmp_name);
 
-  if (!execute_command(command, true)) {
+  if (!execute_command(command.c_str(), true)) {
     return OFFLOAD_FAIL;
   }
 
@@ -102,9 +117,9 @@ int32_t GoogleProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size
 int32_t GoogleProvider::data_delete(void *tgt_ptr, int32_t id) {
   std::string command = "gsutil rm ";
 
-  command += ginfo.Bucket + hdfs.WorkingDir + std::string(filename);
+  command += ginfo.Bucket + hdfs.WorkingDir + std::to_string(id);
 
-  if (!execute_command(command, true)) {
+  if (!execute_command(command.c_str(), true)) {
     return OFFLOAD_FAIL;
   }
 
@@ -139,7 +154,7 @@ int32_t GoogleProvider::submit_job() {
   command += " " + hdfs.UserName;
   command += " " + hdfs.WorkingDir;
 
-  if (!execute_command(command, true)) {
+  if (!execute_command(command.c_str(), true)) {
     return OFFLOAD_FAIL;
   }
 

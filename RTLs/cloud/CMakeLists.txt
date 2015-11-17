@@ -25,7 +25,7 @@ if(CURL_FOUND AND HDFS3_FOUND)
     add_library(inih SHARED inih/ini.c inih/INIReader.cpp)
     add_library(restclient SHARED restclient/restclient.cpp)
 
-    add_library(omptarget.rtl.cloud SHARED src/rtl.cpp src/providers/aws.cpp src/providers/generic.cpp)
+    add_library(omptarget.rtl.cloud SHARED src/rtl.cpp src/providers/aws.cpp src/providers/generic.cpp src/providers/google.cpp)
     target_link_libraries(omptarget.rtl.cloud
       inih
       restclient
