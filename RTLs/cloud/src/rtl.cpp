@@ -312,7 +312,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   // 1) Create tmp file with the library contents
   // 2) Use dlopen to load the file and dlsym to retrieve the symbols
   char tmp_name[] = "/tmp/tmpfile_XXXXXX";
-  int tmp_fd = mkstemp (tmp_name);
+  int tmp_fd = mkstemp(tmp_name);
 
   if (tmp_fd == -1) {
     elf_end(e);

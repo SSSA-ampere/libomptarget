@@ -24,7 +24,7 @@ int32_t GenericProvider::send_file(const char *filename, const char *tgtfilename
 
   if (file == NULL) {
     DP("Opening file in HDFS failed.\n%s", hdfsGetLastError());
-    return -1;
+    return OFFLOAD_FAIL;
   }
 
   std::ifstream hstfile(filename, std::ios::in|std::ios::binary);
@@ -32,7 +32,7 @@ int32_t GenericProvider::send_file(const char *filename, const char *tgtfilename
   if (!hstfile.is_open()) {
     DP("Opening host file %s failed.", filename);
     hdfsCloseFile(fs, file);
-    return -1;
+    return OFFLOAD_FAIL;
   }
 
   char *buffer = new char[4096]();
@@ -52,7 +52,7 @@ int32_t GenericProvider::send_file(const char *filename, const char *tgtfilename
     if (retval < 0) {
       DP("Writing on HDFS failed.\n%s", hdfsGetLastError());
       hdfsCloseFile(fs, file);
-      return -1;
+      return OFFLOAD_FAIL;
     }
 
     if (hstfile.eof()) {
@@ -66,10 +66,10 @@ int32_t GenericProvider::send_file(const char *filename, const char *tgtfilename
 
   if (retval < 0) {
     DP("Closing on HDFS failed.\n%s", hdfsGetLastError());
-    return -1;
+    return OFFLOAD_FAIL;
   }
 
-  return 0;
+  return OFFLOAD_SUCCESS;
 }
 
 void *GenericProvider::data_alloc(int64_t size, int32_t type, int32_t id) {
@@ -212,25 +212,35 @@ int32_t GenericProvider::submit_job() {
   cmd += " " + hdfs.UserName;
   cmd += " " + hdfs.WorkingDir;
 
-  DP("Executing command: %s\n", cmd.c_str());
-
-  FILE *fp = popen(cmd.c_str(), "r");
-
-  if (fp == NULL) {
-    DP("Failed to start spark job.\n");
+  if (!execute_command(cmd, true)) {
     return OFFLOAD_FAIL;
   }
 
-  char buf[512] = {0};
-  uint read = 0;
+  return OFFLOAD_SUCCESS;
+}
 
-  while ((read = fread(buf, sizeof(char), 511, fp)) == 512) {
-    buf[511] = 0;
-    printf("    %s", buf);
+int32_t GenericProvider::execute_command(const char *command, bool print_result) {
+  DP("Executing command: %s\n", command;
+
+  FILE *fp = popen(commad, "r");
+
+  if (fp == NULL) {
+    DP("Failed to execute command.\n");
+    return 0;
   }
 
-  buf[read] = 0;
-  printf("    %s", buf);
+  if (print_result) {
+    char buf[512] = {0};
+    uint read = 0;
 
-  return OFFLOAD_SUCCESS;
+    while ((read = fread(buf, sizeof(char), 511, fp)) == 512) {
+      buf[511] = 0;
+      DP("%s", buf);
+    }
+
+    buf[read] = 0;
+    DP("%s", buf);
+  }
+
+  return 1;
 }

@@ -4,11 +4,13 @@
 #include "../rtl.h"
 
 class GenericProvider {
-  private:
+  protected:
     hdfsFS fs;
     HdfsInfo hdfs;
     SparkInfo spark;
     int32_t currAddr;
+
+    int32_t execute_command(const char *command, bool print_result);
   public:
     GenericProvider(ResourceInfo resources) {
       fs = resources.FS;
@@ -17,12 +19,12 @@ class GenericProvider {
       currAddr = 1;
     }
 
-    int32_t send_file(const char *filename, const char *tgtfilename);
-    void *data_alloc(int64_t size, int32_t type, int32_t id);
-    int32_t data_submit(void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id);
-    int32_t data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id);
-    int32_t data_delete(void *tgt_ptr, int32_t id);
-    int32_t submit_job();
+    virtual int32_t send_file(const char *filename, const char *tgtfilename);
+    virtual void *data_alloc(int64_t size, int32_t type, int32_t id);
+    virtual int32_t data_submit(void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id);
+    virtual int32_t data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id);
+    virtual int32_t data_delete(void *tgt_ptr, int32_t id);
+    virtual int32_t submit_job();
 };
 
 #endif
