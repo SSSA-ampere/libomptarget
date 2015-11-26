@@ -32,7 +32,7 @@ class CloudInfo(var uri: String, var username: String, var path: String) {
   }
   
   def indexedWrite(name: Integer, data: RDD[(Long, Array[Byte])]): Unit = {
-    write(name, data.sortByKey(true).values)
+    write(name, data.sortByKey(true).values.collect.flatten)
   }
 
   def read(id: Integer, size: Integer): RDD[Array[Byte]] = {
