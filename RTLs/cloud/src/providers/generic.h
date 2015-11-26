@@ -9,6 +9,9 @@ class GenericProvider {
     HdfsInfo hdfs;
     SparkInfo spark;
     int32_t currAddr;
+
+    int32_t submit_cluster();
+    int32_t submit_local();
   public:
     GenericProvider(ResourceInfo resources) {
       fs = resources.FS;
