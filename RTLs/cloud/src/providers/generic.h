@@ -12,6 +12,8 @@ class GenericProvider {
     int32_t currAddr;
 
     int32_t execute_command(const char *command, bool print_result);
+    int32_t submit_cluster();
+    int32_t submit_local();
   public:
     GenericProvider(ResourceInfo resources) {
       fs = resources.FS;
