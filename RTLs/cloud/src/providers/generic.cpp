@@ -338,12 +338,12 @@ int32_t GenericProvider::submit_cluster() {
       if (!strcmp(answer["driverState"].GetString(), "RUNNING")) {
         std::this_thread::sleep_for(std::chrono::milliseconds(spark.PollInterval));
         continue;
+      } else if (!strcmp(answer["driverState"].GetString(), "FINISHED") && answer["success"].GetBool()) {
+        DP("Got response: SUCCEED!\n");
+        return OFFLOAD_SUCCESS;
       } else {
-        if (!strcmp(answer["driverState"].GetString(), "FINISHED") && answer["success"].GetBool()) {
-          return OFFLOAD_SUCCESS;
-        } else {
-          return OFFLOAD_FAIL;
-        }
+        DP("Got response: FAILED!\n");
+        return OFFLOAD_FAIL;
       }
     } else {
       DP("Got response %d from REST server when polling\n", r.code);
