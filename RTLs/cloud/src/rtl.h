@@ -53,6 +53,12 @@ struct ResourceInfo {
   struct ProxyInfo Proxy;
 };
 
+struct ProviderListEntry {
+  std::string ProviderName;
+  GenericProvider *(*ProviderGenerator)(ResourceInfo &);
+  std::string SectionName;
+};
+
 #define DEFAULT_CLOUD_RTL_CONF_FILE "cloud_rtl.ini"
 #define DEFAULT_HDFS_PORT 9000
 #define DEFAULT_SPARK_PORT 7077

@@ -45,13 +45,17 @@
 #define TARGET_NAME Cloud
 #endif
 
-#define GETNAME2(name) #name
-#define GETNAME(name) GETNAME2(name)
+#define GETNAME(name) #name
 #define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL",__VA_ARGS__)
 
-#define NUMBER_OF_DEVICES 1
-
 static RTLDeviceInfoTy DeviceInfo;
+
+struct ProviderListEntry ProviderList[] = {
+  {"Generic", createGenericProvider, "GenericProvider"},
+  {"Google", NULL, "GoogleProvider"}
+};
+
+#define NUMBER_OF_DEVICES 1
 
 RTLDeviceInfoTy::RTLDeviceInfoTy() {
   NumberOfDevices = 1;
@@ -122,17 +126,7 @@ __tgt_target_table *RTLDeviceInfoTy::getOffloadEntriesTable(int32_t device_id){
 extern "C" {
 #endif
 
-int _cloud_spark_create_program() {
-  // 1/ Generate scala code (with template)
-  // 2/ Compile in jar -> system("sbt package");
-  // 3/ Generate native kernel code (map function)
-  // 4/ Compile
-  // 5/ Upload to HDFS
-  return 0;
-}
-
 int __tgt_rtl_device_type(int32_t device_id){
-
   return 0;
 }
 
@@ -243,7 +237,12 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     DeviceInfo.ProxyOptions,
   };
 
-  DeviceInfo.Providers[device_id] = new GenericProvider(resources);
+  // Checking for listed provider. Each device id refers to a provider position
+  // in the list
+  DP("Creating provider %s", ProviderList[device_id].ProviderName.c_str());
+  std::string providerSectionName = ProviderList[device_id].SectionName;
+  DeviceInfo.Providers[device_id] = ProviderList[device_id].ProviderGenerator(resources);
+  DeviceInfo.Providers[device_id]->parse_config(reader);
 
   return OFFLOAD_SUCCESS; // success
 }

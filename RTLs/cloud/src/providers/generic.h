@@ -4,6 +4,8 @@
 #include "INIReader.h"
 #include "../rtl.h"
 
+GenericProvider *createGenericProvider(ResourceInfo &resources);
+
 class GenericProvider {
   protected:
     hdfsFS fs;
@@ -15,7 +17,7 @@ class GenericProvider {
     int32_t submit_cluster();
     int32_t submit_local();
   public:
-    GenericProvider(ResourceInfo resources) {
+    GenericProvider(ResourceInfo &resources) {
       fs = resources.FS;
       hdfs = resources.HDFSInfo;
       spark = resources.Spark;

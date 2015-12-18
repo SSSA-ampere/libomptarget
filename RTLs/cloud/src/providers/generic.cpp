@@ -22,6 +22,10 @@
 #define GETNAME(name) GETNAME2(name)
 #define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Generic Provider:", __VA_ARGS__)
 
+GenericProvider *createGenericProvider(ResourceInfo &resources) {
+  return new GenericProvider(resources);
+}
+
 int32_t GenericProvider::parse_config(INIReader reader) {
   return OFFLOAD_SUCCESS;
 }
@@ -169,8 +173,6 @@ int32_t GenericProvider::data_delete(void *tgt_ptr, int32_t id) {
   return OFFLOAD_SUCCESS;
 }
 
-
-
 int32_t GenericProvider::submit_job() {
   if(spark.Mode == SparkMode::cluster) {
     submit_cluster();
@@ -180,7 +182,6 @@ int32_t GenericProvider::submit_job() {
 }
 
 int32_t GenericProvider::submit_cluster() {
-
   // Checking if proxy option is set. If it is, set it already
   /*
   if (proxy.HostName != "") {
@@ -408,4 +409,3 @@ int32_t GenericProvider::execute_command(const char *command, bool print_result)
 
   return 1;
 }
-
