@@ -10,6 +10,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 // Read an INI file into easy-to-access name/value pairs. (Note that I've gone
 // for simplicity here rather than speed, but it should be pretty decent.)
@@ -23,6 +24,9 @@ public:
     // Return the result of ini_parse(), i.e., 0 on success, line number of
     // first error on parse error, or -1 on file open error.
     int ParseError();
+
+    // Returns true if a given section was found in the INI file, false otherwise.
+    bool HasSection(std::string section);
 
     // Get a string value from INI file, returning default_value if not found.
     std::string Get(std::string section, std::string name,
@@ -45,6 +49,7 @@ public:
 private:
     int _error;
     std::map<std::string, std::string> _values;
+    std::vector<std::string> _sections;
     static std::string MakeKey(std::string section, std::string name);
     static int ValueHandler(void* user, const char* section, const char* name,
                             const char* value);

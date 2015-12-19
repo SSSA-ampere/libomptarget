@@ -30,8 +30,8 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
-#include "providers/generic.h"
 #include "rtl.h"
+#include "providers/generic.h"
 
 #include "omptarget.h"
 #include "INIReader.h"
@@ -46,21 +46,31 @@
 #endif
 
 #define GETNAME(name) #name
-#define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL",__VA_ARGS__)
+#define GETNAME2(name) GETNAME(name)
+#define DP(...) DEBUGP("Target " GETNAME2(TARGET_NAME) " RTL",__VA_ARGS__)
 
-static RTLDeviceInfoTy DeviceInfo;
-
-struct ProviderListEntry ProviderList[] = {
+static std::vector<struct ProviderListEntry> ProviderList = {
   {"Generic", createGenericProvider, "GenericProvider"},
   {"Google", NULL, "GoogleProvider"}
 };
 
-#define NUMBER_OF_DEVICES 1
+static RTLDeviceInfoTy DeviceInfo;
 
 RTLDeviceInfoTy::RTLDeviceInfoTy() {
-  NumberOfDevices = 1;
+  INIReader reader(DEFAULT_CLOUD_RTL_CONF_FILE);
 
-  // TODO: Detect the number of clouds available
+  NumberOfDevices = 0;
+
+  // Checking how many providers we have in the configuration file
+  for (auto entry : ProviderList) {
+    if (reader.HasSection(entry.SectionName)) {
+      DP("Provider '%s' detected in configuration file.\n", entry.ProviderName.c_str());
+      NumberOfDevices++;
+    }
+  }
+
+  DP("Number of Devices: %d\n", NumberOfDevices);
+
   FuncGblEntries.resize(NumberOfDevices);
   HdfsClusters.resize(NumberOfDevices);
   SparkClusters.resize(NumberOfDevices);
@@ -68,10 +78,8 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
   Providers.resize(NumberOfDevices);
 
   // Parsing proxy configuration, if exists
-  INIReader reader(DEFAULT_CLOUD_RTL_CONF_FILE);
-
   if (reader.ParseError() < 0) {
-    DP("Couldn't find '%s'!", DEFAULT_CLOUD_RTL_CONF_FILE);
+    DP("Couldn't find '%s'!\n", DEFAULT_CLOUD_RTL_CONF_FILE);
   } else {
     ProxyInfo proxy {
       reader.Get("Proxy", "HostName", DEFAULT_PROXY_HOSTNAME),
@@ -239,7 +247,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
 
   // Checking for listed provider. Each device id refers to a provider position
   // in the list
-  DP("Creating provider %s", ProviderList[device_id].ProviderName.c_str());
+  DP("Creating provider %s\n", ProviderList[device_id].ProviderName.c_str());
+
   std::string providerSectionName = ProviderList[device_id].SectionName;
   DeviceInfo.Providers[device_id] = ProviderList[device_id].ProviderGenerator(resources);
   DeviceInfo.Providers[device_id]->parse_config(reader);
@@ -251,7 +260,8 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   DP("Dev %d: load binary from 0x%llx image\n", device_id,
       (long long)image->ImageStart);
 
-  assert(device_id>=0 && device_id<NUMBER_OF_DEVICES && "bad dev id");
+  // TODO: fix the NUMBER_OF_DEVICES stuff
+  //assert(device_id>=0 && device_id<NUMBER_OF_DEVICES && "bad dev id");
 
   size_t ImageSize = (size_t)image->ImageEnd - (size_t)image->ImageStart;
   size_t NumEntries = (size_t) (image->EntriesEnd - image->EntriesBegin);

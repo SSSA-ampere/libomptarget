@@ -23,6 +23,10 @@ int INIReader::ParseError()
     return _error;
 }
 
+bool INIReader::HasSection(string section) {
+    return std::find(_sections.begin(), _sections.end(), section) != _sections.end();
+}
+
 string INIReader::Get(string section, string name, string default_value)
 {
     string key = MakeKey(section, name);
@@ -73,6 +77,12 @@ int INIReader::ValueHandler(void* user, const char* section, const char* name,
                             const char* value)
 {
     INIReader* reader = (INIReader*)user;
+
+    // Populating section names
+    if (std::find(reader->_sections.begin(), reader->_sections.end(), section) == reader->_sections.end()) {
+      reader->_sections.push_back(section);
+    }
+
     string key = MakeKey(section, name);
     if (reader->_values[key].size() > 0)
         reader->_values[key] += "\n";
