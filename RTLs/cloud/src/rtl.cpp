@@ -260,8 +260,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
   DP("Dev %d: load binary from 0x%llx image\n", device_id,
       (long long)image->ImageStart);
 
-  // TODO: fix the NUMBER_OF_DEVICES stuff
-  //assert(device_id>=0 && device_id<NUMBER_OF_DEVICES && "bad dev id");
+  assert(device_id>=0 && device_id<DeviceInfo.NumberOfDevices && "bad dev id");
 
   size_t ImageSize = (size_t)image->ImageEnd - (size_t)image->ImageStart;
   size_t NumEntries = (size_t) (image->EntriesEnd - image->EntriesBegin);
