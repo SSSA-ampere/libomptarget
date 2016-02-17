@@ -23,7 +23,12 @@ if(CURL_FOUND AND HDFS3_FOUND)
     include_directories(inih rapidjson restclient ${CURL_INCLUDE_DIR} ${HDFS3_INCLUDE_DIR})
 
     add_library(inih SHARED inih/ini.c inih/INIReader.cpp)
-    add_library(restclient SHARED restclient/restclient.cpp)
+
+    if(APPLE)
+        add_library(restclient restclient/restclient.cpp)
+    else()
+        add_library(restclient SHARED restclient/restclient.cpp)
+    endif()
 
     add_library(omptarget.rtl.cloud SHARED src/rtl.cpp src/providers/aws.cpp src/providers/generic.cpp src/providers/google.cpp)
     target_link_libraries(omptarget.rtl.cloud
