@@ -32,6 +32,7 @@
 
 #include "rtl.h"
 #include "providers/generic.h"
+#include "providers/amazon.h"
 
 #include "omptarget.h"
 #include "INIReader.h"
@@ -49,10 +50,13 @@
 #define GETNAME2(name) GETNAME(name)
 #define DP(...) DEBUGP("Target " GETNAME2(TARGET_NAME) " RTL",__VA_ARGS__)
 
-static std::vector<struct ProviderListEntry> ProviderList = {
+static std::vector<struct ProviderListEntry> ExistingProviderList = {
   {"Generic", createGenericProvider, "GenericProvider"},
-  {"Google", NULL, "GoogleProvider"}
+  {"Google", NULL, "GoogleProvider"},
+  {"AWS", createAmazonProvider, "AWSProvider"}
 };
+
+static std::vector<struct ProviderListEntry> ProviderList;
 
 static RTLDeviceInfoTy DeviceInfo;
 
@@ -62,9 +66,10 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
   NumberOfDevices = 0;
 
   // Checking how many providers we have in the configuration file
-  for (auto entry : ProviderList) {
+  for (auto entry : ExistingProviderList) {
     if (reader.HasSection(entry.SectionName)) {
       DP("Provider '%s' detected in configuration file.\n", entry.ProviderName.c_str());
+      ProviderList.push_back(entry);
       NumberOfDevices++;
     }
   }

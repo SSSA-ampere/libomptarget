@@ -30,7 +30,7 @@ if(CURL_FOUND AND HDFS3_FOUND)
         add_library(restclient SHARED restclient/restclient.cpp)
     endif()
 
-    add_library(omptarget.rtl.cloud SHARED src/rtl.cpp src/providers/aws.cpp src/providers/generic.cpp src/providers/google.cpp)
+    add_library(omptarget.rtl.cloud SHARED src/rtl.cpp src/providers/amazon.cpp src/providers/generic.cpp src/providers/google.cpp)
     target_link_libraries(omptarget.rtl.cloud
       inih
       restclient
