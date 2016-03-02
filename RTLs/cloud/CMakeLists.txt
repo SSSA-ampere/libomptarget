@@ -15,8 +15,10 @@
 
 find_package(HDFS3 QUIET)
 find_package(CURL QUIET)
+find_package(LibSSH QUIET)
 
-if(CURL_FOUND AND HDFS3_FOUND)
+
+if(CURL_FOUND AND HDFS3_FOUND AND LIBSSH_FOUND)
 
     message("Building cloud target RTL")
 
@@ -37,10 +39,20 @@ if(CURL_FOUND AND HDFS3_FOUND)
       ${HDFS3_LIBRARY}
       ${LIBELF_LIBRARIES}
       ${CURL_LIBRARIES}
+      ${LIBSSH_LIBRARIES}
     )
 
 else()
 
-    message("LibHDFS3 and/or Curl not found in system: not building cloud RTL")
+    if(NOT CURL_FOUND)
+        message("Curl not found in system:")
+    endif()
+    if(NOT HDFS3_FOUND)
+        message("LibHDFS3 not found in system:")
+    endif()
+    if(NOT LIBSSH_FOUND)
+        message("LibSSH not found in system:")
+    endif()
+    message("not building cloud RTL")
 
 endif()

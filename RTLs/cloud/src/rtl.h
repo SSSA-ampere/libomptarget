@@ -48,9 +48,9 @@ struct ProxyInfo {
 
 struct ResourceInfo {
   struct HdfsInfo HDFSInfo;
-  hdfsFS FS;
   struct SparkInfo Spark;
   struct ProxyInfo Proxy;
+  hdfsFS FS;
 };
 
 struct ProviderListEntry {

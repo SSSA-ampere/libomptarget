@@ -26,6 +26,7 @@
 #ifndef __APPLE__
 #include <link.h>
 #endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -53,7 +54,7 @@
 static std::vector<struct ProviderListEntry> ExistingProviderList = {
   {"Generic", createGenericProvider, "GenericProvider"},
   {"Google", NULL, "GoogleProvider"},
-  {"AWS", createAmazonProvider, "AWSProvider"}
+  {"AWS", createAmazonProvider, "AmazonProvider"}
 };
 
 static std::vector<struct ProviderListEntry> ProviderList;
@@ -184,29 +185,6 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     hdfs.WorkingDir += "/";
   }
 
-  // Init connection to HDFS cluster
-  struct hdfsBuilder *builder = hdfsNewBuilder();
-  hdfsBuilderSetNameNode(builder, hdfs.ServAddress.c_str());
-  hdfsBuilderSetNameNodePort(builder, hdfs.ServPort);
-  hdfsBuilderSetUserName(builder, hdfs.UserName.c_str());
-  hdfsFS fs = hdfsBuilderConnect(builder);
-
-  if (fs == NULL) {
-    DP("Connection problem with HDFS cluster. Check your configuration in 'cloud_rtl.ini'.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  hdfsFreeBuilder(builder);
-  DeviceInfo.HdfsNodes[device_id] = fs;
-
-  if(hdfsExists(fs, hdfs.WorkingDir.c_str()) < 0) {
-    retval = hdfsCreateDirectory(fs, hdfs.WorkingDir.c_str());
-    if(retval < 0) {
-      DP("%s", hdfsGetLastError());
-      return OFFLOAD_FAIL;
-    }
-  }
-
   // TODO: Check connection to Apache Spark cluster
 
   SparkMode mode;
@@ -245,7 +223,6 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
 
   ResourceInfo resources {
     hdfs,
-    fs,
     spark,
     DeviceInfo.ProxyOptions,
   };
@@ -257,6 +234,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
   std::string providerSectionName = ProviderList[device_id].SectionName;
   DeviceInfo.Providers[device_id] = ProviderList[device_id].ProviderGenerator(resources);
   DeviceInfo.Providers[device_id]->parse_config(reader);
+  DeviceInfo.Providers[device_id]->init_device();
+
 
   return OFFLOAD_SUCCESS; // success
 }
@@ -399,6 +378,11 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type, int32_
 }
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id){
+  if (id < 0) {
+    DP("No need to submit pointer\n");
+    return OFFLOAD_SUCCESS;
+  }
+
   return DeviceInfo.Providers[device_id]->data_submit(tgt_ptr, hst_ptr, size, id);
 }
 
@@ -407,6 +391,11 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr, int32_t id){
+  if(id < 0) {
+    DP("No file to delete\n");
+    return OFFLOAD_SUCCESS;
+  }
+
   return DeviceInfo.Providers[device_id]->data_delete(tgt_ptr, id);
 }
 

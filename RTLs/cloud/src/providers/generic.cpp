@@ -30,6 +30,35 @@ int32_t GenericProvider::parse_config(INIReader reader) {
   return OFFLOAD_SUCCESS;
 }
 
+int32_t GenericProvider::init_device() {
+  int retval;
+
+  // Init connection to HDFS cluster
+  struct hdfsBuilder *builder = hdfsNewBuilder();
+  hdfsBuilderSetNameNode(builder, hdfs.ServAddress.c_str());
+  hdfsBuilderSetNameNodePort(builder, hdfs.ServPort);
+  hdfsBuilderSetUserName(builder, hdfs.UserName.c_str());
+  fs = hdfsBuilderConnect(builder);
+
+  if (fs == NULL) {
+    DP("Connection problem with HDFS cluster. Check your configuration in 'cloud_rtl.ini'.\n");
+    return OFFLOAD_FAIL;
+  }
+
+  hdfsFreeBuilder(builder);
+
+  if(hdfsExists(fs, hdfs.WorkingDir.c_str()) < 0) {
+    retval = hdfsCreateDirectory(fs, hdfs.WorkingDir.c_str());
+    if(retval < 0) {
+      DP("%s", hdfsGetLastError());
+      return OFFLOAD_FAIL;
+    }
+  }
+
+
+  return OFFLOAD_SUCCESS;
+}
+
 int32_t GenericProvider::send_file(const char *filename, const char *tgtfilename) {
   std::string final_name = hdfs.WorkingDir + std::string(tgtfilename);
 
@@ -97,11 +126,6 @@ void *GenericProvider::data_alloc(int64_t size, int32_t type, int32_t id) {
 }
 
 int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id) {
-  if (id < 0) {
-    DP("No need to submit pointer\n");
-    return OFFLOAD_SUCCESS;
-  }
-
   // Since we now need the hdfs file, we create it here
   std::string filename = hdfs.WorkingDir + std::to_string(id);
   DP("Submitting data to file %s\n", filename.c_str());
@@ -155,11 +179,6 @@ int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t siz
 }
 
 int32_t GenericProvider::data_delete(void *tgt_ptr, int32_t id) {
-  if(id < 0) {
-    DP("No file to delete\n");
-    return OFFLOAD_SUCCESS;
-  }
-
   std::string filename = hdfs.WorkingDir + std::to_string(id);
 
   DP("Deleting file '%s'\n", filename.c_str());
@@ -174,11 +193,13 @@ int32_t GenericProvider::data_delete(void *tgt_ptr, int32_t id) {
 }
 
 int32_t GenericProvider::submit_job() {
+  int32_t res;
   if(spark.Mode == SparkMode::cluster) {
-    submit_cluster();
+    res = submit_cluster();
   } else {
-    submit_local();
+    res = submit_local();
   }
+  return res;
 }
 
 int32_t GenericProvider::submit_cluster() {
@@ -362,10 +383,11 @@ int32_t GenericProvider::submit_local(){
 
   // Spark job entry point
   cmd += " --class " + spark.Package + " " + spark.JarPath;
+  cmd += " ";
 
   // Execution arguments pass to the spark kernel
   if (hdfs.ServAddress.find("://") == std::string::npos) {
-    cmd += " hdfs://";
+    cmd += "hdfs://";
   }
   cmd += hdfs.ServAddress;
 
