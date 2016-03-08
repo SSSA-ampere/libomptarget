@@ -31,15 +31,19 @@ class CloudInfo(var uri: String, var username: String, var path: String) {
     data.saveAsObjectFile(fullpath + name)
   }
 
-  def indexedWrite(name: Integer, data: RDD[(Long, Array[Byte])]): Unit = {
-    write(name, data.sortByKey(true).values.collect.flatten)
+  def indexedWrite(name: Integer, size: Integer, data: RDD[(Long, Array[Byte])]): Unit = {
+    val zero = for (i <- 0 to size - 1) yield 0
+    val test = zero.map { x => x.toByte }.toArray
+    val missing = sc.parallelize(0.toLong to 299).subtract(data.keys).map { x => (x, Array[Byte](0, 0, 0, 0)) }
+    val all = missing.++(data)
+    fs.write(name, all.sortByKey(true).values.collect.flatten)
   }
 
   def read(id: Integer, size: Integer): RDD[Array[Byte]] = {
     sc.binaryRecords(uri + path + id, size)
   }
   def indexedRead(id: Integer, size: Integer): RDD[(Long, Array[Byte])] = {
-    read(id, size).zipWithIndex().map{case (k,v) => (v,k)}
+    read(id, size).zipWithUniqueId().map { x => (x._2, x._1.clone()) }
   }
 
   def fullpath = {
