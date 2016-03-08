@@ -22,7 +22,7 @@ if(CURL_FOUND AND HDFS3_FOUND AND LIBSSH_FOUND)
 
     message("Building cloud target RTL")
 
-    include_directories(inih rapidjson restclient ${CURL_INCLUDE_DIR} ${HDFS3_INCLUDE_DIR})
+    include_directories(inih rapidjson restclient ${CURL_INCLUDE_DIR} ${HDFS3_INCLUDE_DIR} ${LIBSSH_INCLUDE_DIRS})
 
     add_library(inih SHARED inih/ini.c inih/INIReader.cpp)
 
