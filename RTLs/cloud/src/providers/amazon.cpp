@@ -21,7 +21,7 @@
 
 #define GETNAME2(name) #name
 #define GETNAME(name) GETNAME2(name)
-#define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Google Provider:", __VA_ARGS__)
+#define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Amazon Provider:", __VA_ARGS__)
 
 // ./spark-ec2 -k <keypair> -i <key-file> -s <num-slaves> launch <cluster-name>
 
