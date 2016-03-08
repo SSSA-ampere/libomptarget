@@ -383,27 +383,46 @@ int32_t GenericProvider::submit_local(){
 
   // Spark job entry point
   cmd += " --class " + spark.Package + " " + spark.JarPath;
-  cmd += " ";
+
 
   // Execution arguments pass to the spark kernel
-  if (hdfs.ServAddress.find("://") == std::string::npos) {
-    cmd += "hdfs://";
-  }
-  cmd += hdfs.ServAddress;
-
-  if (hdfs.ServAddress.back() == '/') {
-    cmd.erase(cmd.end() - 1);
-  }
-
-  cmd += ":" + std::to_string(hdfs.ServPort);
-  cmd += " " + hdfs.UserName;
-  cmd += " " + hdfs.WorkingDir;
+  cmd += " " + get_job_args();
 
   if (!execute_command(cmd.c_str(), true)) {
     return OFFLOAD_FAIL;
   }
 
   return OFFLOAD_SUCCESS;
+}
+
+std::string GenericProvider::get_job_args() {
+  std::string args = "";
+
+  if (hdfs.ServAddress.find("s3") != std::string::npos) {
+    args += "S3";
+  } else {
+    args += "HDFS";
+  }
+
+  args += " ";
+
+  if (hdfs.ServAddress.find("://") == std::string::npos) {
+    args += "hdfs://";
+  }
+  args += hdfs.ServAddress;
+
+  if (hdfs.ServAddress.back() == '/') {
+    args.erase(args.end() - 1);
+  }
+
+  if (hdfs.ServAddress.find("hdfs") != std::string::npos) {
+    args += ":" + std::to_string(hdfs.ServPort);
+  }
+
+  args += " " + hdfs.UserName;
+  args += " " + hdfs.WorkingDir;
+
+  return args;
 }
 
 int32_t GenericProvider::execute_command(const char *command, bool print_result) {

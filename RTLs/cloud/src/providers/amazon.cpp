@@ -30,16 +30,13 @@ GenericProvider *createAmazonProvider(ResourceInfo &resources) {
 }
 
 int32_t AmazonProvider::parse_config(INIReader reader) {
-  AmazonInfo info {
-    reader.Get("AmazonProvider", "Bucket", ""),
-        reader.Get("AmazonProvider", "Cluster", ""),
-        reader.Get("AmazonProvider", "AccessKey", ""),
-        reader.Get("AmazonProvider", "SecretKey", ""),
-        reader.Get("AmazonProvider", "KeyFile", ""),
-        reader.Get("AmazonProvider", "AdditionalArgs", ""),
-  };
 
-  ainfo = info;
+  ainfo.Bucket = reader.Get("AmazonProvider", "Bucket", "");
+  ainfo.Cluster = reader.Get("AmazonProvider", "Cluster", "");
+  ainfo.AccessKey = reader.Get("AmazonProvider", "AccessKey", "");
+  ainfo.SecretKey = reader.Get("AmazonProvider", "SecretKey", "");
+  ainfo.KeyFile = reader.Get("AmazonProvider", "KeyFile", "");
+  ainfo.AdditionalArgs = reader.Get("AmazonProvider", "AdditionalArgs", "");
 
   return OFFLOAD_SUCCESS;
 }
@@ -102,16 +99,9 @@ int32_t AmazonProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size, 
 }
 
 int32_t AmazonProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id) {
+  DP("File %d, size %d.\n", id, size);
   // Creating temporary file to hold data retrieved
-  char tmp_name[] = "/tmp/tmpfile_XXXXXX";
-
-
-  int tmp_fd = mkstemp(tmp_name);
-
-  if (tmp_fd == -1) {
-    DP("Could not create temporary file.\n");
-    return OFFLOAD_FAIL;
-  }
+  const char *tmp_name = "/tmp/tmpfile_da";
 
   // Copying data from cloud
   std::string command = "s3cmd get --force ";
@@ -124,7 +114,7 @@ int32_t AmazonProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size
   }
 
   // Reading contents of temporary file
-  FILE *ftmp = fopen(tmp_name, "wb");
+  FILE *ftmp = fopen(tmp_name, "rb");
 
   if (!ftmp) {
     DP("Could not open temporary file.\n");
@@ -132,7 +122,7 @@ int32_t AmazonProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size
   }
 
   if (fread(hst_ptr, 1, size, ftmp) != size) {
-    DP("Could not successfully read temporary file.\n");
+    DP("Could not successfully read temporary file. => %d\n", size);
     fclose(ftmp);
     return OFFLOAD_FAIL;
   }
@@ -336,12 +326,11 @@ int32_t AmazonProvider::submit_job() {
 
   std::string cmd = "export AWS_ACCESS_KEY_ID=" + ainfo.AccessKey +
                      " && export AWS_SECRET_ACCESS_KEY=" + ainfo.SecretKey +
-                     " && ./spark/bin/spark-submit --driver-memory 512m --executor-memory 256m --master local"
-                     " --class " + spark.Package +
-                     " spark_job.jar"
-                     " s3n://ldktest"
-                     " hyviquel"
-                     " " + hdfs.WorkingDir;
+                     " && ./spark/bin/spark-submit --master local " + spark.AdditionalArgs +
+                     " --class " + spark.Package + " spark_job.jar " +
+                     get_job_args();
+
+  DP("Executing SSH command: %s\n", cmd.c_str());
 
   rc = ssh_channel_request_exec(channel, cmd.c_str());
 

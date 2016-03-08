@@ -205,6 +205,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id){
     reader.Get("Spark", "Package", DEFAULT_SPARK_PACKAGE),
     reader.Get("Spark", "JarPath", DEFAULT_SPARK_JARPATH),
     (int) reader.GetInteger("Spark", "PollInterval", DEFAULT_SPARK_POLLINTERVAL),
+    reader.Get("Spark", "AdditionalArgs", DEFAULT_SPARK_JARPATH),
   };
 
   if (spark.Mode == SparkMode::invalid ||

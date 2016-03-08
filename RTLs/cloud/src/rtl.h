@@ -38,6 +38,7 @@ struct SparkInfo{
   std::string Package;
   std::string JarPath;
   int PollInterval;
+  std::string AdditionalArgs;
 };
 
 struct ProxyInfo {
