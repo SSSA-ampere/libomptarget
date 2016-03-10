@@ -1,7 +1,6 @@
 package org.llvm.openmp
 
 import java.io.ByteArrayInputStream
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.fs.Path
@@ -11,10 +10,10 @@ import org.apache.spark.annotation.Experimental
 import org.apache.spark.rdd.RDD
 import org.apache.spark.rdd.RDD.rddToOrderedRDDFunctions
 import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
-
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.ObjectMetadata
+import org.apache.spark.SparkFiles
 
 abstract class CloudFileSystem(val name: String) {
 
@@ -51,6 +50,20 @@ class Hdfs(path: String, uri: String, username: String) extends CloudFileSystem(
   }
 }
 
+object NativeKernels {
+  
+  val LibraryName = "libmr.so"
+
+  @transient 
+  var isAlreadyLoaded = false
+
+  def loadOnce() : Unit = {
+    if (isAlreadyLoaded) return;
+    System.load(SparkFiles.get(LibraryName))
+    isAlreadyLoaded = true
+  }
+}
+
 class CloudInfo(var filesystem: String, var uri: String, var username: String, var path: String) {
 
   val conf = new SparkConf()
@@ -63,7 +76,7 @@ class CloudInfo(var filesystem: String, var uri: String, var username: String, v
   }
 
   // Load library containing native kernel
-  sc.addFile(fullpath + "libmr.so")
+  sc.addFile(fullpath + NativeKernels.LibraryName)
 
   def write(name: Integer, data: RDD[Array[Byte]]): Unit = {
     data.saveAsObjectFile(fullpath + name)
