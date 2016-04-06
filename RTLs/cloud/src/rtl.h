@@ -88,6 +88,7 @@ public:
   ProxyInfo ProxyOptions;
   std::vector<hdfsFS> HdfsNodes;
   std::vector<GenericProvider*> Providers;
+  std::vector<std::string> AddressTables;
 
   // Record entry point associated with device
   void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin, __tgt_offload_entry *end);

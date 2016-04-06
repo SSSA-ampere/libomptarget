@@ -1,5 +1,6 @@
 package org.llvm.openmp
 
+import java.io.InputStream
 import java.io.ByteArrayInputStream
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileSystem
@@ -15,12 +16,20 @@ import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.ObjectMetadata
 import org.apache.spark.SparkFiles
 import com.amazonaws.util.IOUtils
+import java.util.HashMap
 
 abstract class CloudFileSystem(val name: String) {
 
   def write(name: Integer, data: Array[Byte]): Unit
   
-  def read(name: Integer, size: Integer): Array[Byte]
+  def read(name: String): InputStream
+  
+  def read(name: Integer, size: Integer): Array[Byte] = {
+    val is = read(name.toString)
+    val data = IOUtils.toByteArray(is)
+    is.close
+    return data
+  }
 
 }
 
@@ -37,14 +46,11 @@ class S3(path: String, uri: String) extends CloudFileSystem("S3") {
     amazonS3Client.putObject(bucket, key, new ByteArrayInputStream(data), new ObjectMetadata)
   }
   
-  override def read(name: Integer, size: Integer): Array[Byte] = {
+  override def read(name: String): InputStream = {
     var key = path + name
     if (key.startsWith("/"))
       key = key.substring(1)
-    val is = amazonS3Client.getObject(bucket, key).getObjectContent()
-    val data = IOUtils.toByteArray(is)
-    is.close
-    return data
+    amazonS3Client.getObject(bucket, key).getObjectContent()
   }
   
 }
@@ -63,12 +69,9 @@ class Hdfs(path: String, uri: String, username: String) extends CloudFileSystem(
     os.close
   }
   
-  override def read(name: Integer, size: Integer): Array[Byte] = {
+  override def read(name: String): InputStream = {
     val filepath = new Path(path + name)
-    val is = fs.open(filepath, size)
-    val data = IOUtils.toByteArray(is)
-    is.close
-    return data
+    fs.open(filepath)
   }
 }
 
@@ -86,17 +89,37 @@ object NativeKernels {
   }
 }
 
+class AddressTable(csv : String) {
+  val mapSize = new HashMap[Integer, Integer]
+  
+  for (line <- csv.lines) {
+    val values = line.split(";").map(_.trim)
+    val name = values(0).toInt
+    val size = values(1).toInt
+    mapSize.put(name, size)
+  }
+  
+  def sizeOf(name : Integer) = {
+    mapSize.get(name)
+  }
+}
+
 class CloudInfo(var filesystem: String, var uri: String, var username: String, var path: String) {
 
   val conf = new SparkConf()
   val sc = new SparkContext(conf)
 
+  // Initialize file system according to the provider
   val fs = filesystem match {
     case "S3" => new S3(path, uri)
     case "HDFS" => new Hdfs(path, uri, username)
     case _ => throw new RuntimeException(filesystem + " is not a supported file system.")
   }
-
+  
+  // Initialize address table
+  val csv = fs.read("addressTable")
+  val addressTable = new AddressTable(IOUtils.toString(csv))
+  
   // Load library containing native kernel
   sc.addFile(fullpath + NativeKernels.LibraryName)
 
@@ -104,10 +127,10 @@ class CloudInfo(var filesystem: String, var uri: String, var username: String, v
     data.saveAsObjectFile(fullpath + name)
   }
 
-  def indexedWrite(name: Integer, size: Integer, data: RDD[(Long, Array[Byte])]): Unit = {
-    val zero = for (i <- 0 to size - 1) yield 0
-    val test = zero.map { x => x.toByte }.toArray
-    val missing = sc.parallelize(0.toLong to 299).subtract(data.keys).map { x => (x, Array[Byte](0, 0, 0, 0)) }
+  def indexedWrite(name: Integer, elementSize: Integer, data: RDD[(Long, Array[Byte])]): Unit = {
+    val size = addressTable.sizeOf(name) / elementSize
+    val indexes = data.keys.coalesce(1)
+    val missing = sc.parallelize(0.toLong to size-1).subtract(indexes).map{ x => (x, Array.fill[Byte](elementSize)(0)) }
     val all = missing.++(data)
     fs.write(name, all.sortByKey(true).values.collect.flatten)
   }
@@ -117,7 +140,7 @@ class CloudInfo(var filesystem: String, var uri: String, var username: String, v
   }
 
   def indexedRead(id: Integer, size: Integer): RDD[(Long, Array[Byte])] = {
-    readRDD(id, size).zipWithUniqueId().map { x => (x._2, x._1.clone()) }
+    readRDD(id, size).zipWithIndex().map { x => (x._2, x._1.clone()) }
   }
   
   def read(id: Integer, size: Integer): Array[Byte] = {

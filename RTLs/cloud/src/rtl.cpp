@@ -83,6 +83,12 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
   HdfsNodes.resize(NumberOfDevices);
   Providers.resize(NumberOfDevices);
 
+  for(int i=0; i<NumberOfDevices; i++) {
+    char *tmpname = strdup("/tmp/tmpfileXXXXXX");
+    mkstemp(tmpname);
+    AddressTables.push_back(std::string(tmpname));
+  }
+
   // Parsing proxy configuration, if exists
   if (reader.ParseError() < 0) {
     DP("Couldn't find '%s'!\n", DEFAULT_CLOUD_RTL_CONF_FILE);
@@ -375,6 +381,14 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id, __tgt_device_image 
 }
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type, int32_t id){
+
+  if (id < 0) {
+    // Write entry in the address table
+    std::ofstream ofs(DeviceInfo.AddressTables[device_id], std::ios_base::app);
+    ofs << id << ";" << size << ";" << std::endl;
+    ofs.close();
+  }
+
   return DeviceInfo.Providers[device_id]->data_alloc(size, type, id);
 }
 
@@ -402,6 +416,9 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr, int32_t id){
 
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
     void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit) {
+  const char *fileName = DeviceInfo.AddressTables[device_id].c_str();
+  DeviceInfo.Providers[device_id]->send_file(fileName, "addressTable");
+
   return DeviceInfo.Providers[device_id]->submit_job();
 }
 
