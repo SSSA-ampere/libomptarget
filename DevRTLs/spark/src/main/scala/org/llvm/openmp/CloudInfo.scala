@@ -129,7 +129,7 @@ class CloudInfo(var filesystem: String, var uri: String, var username: String, v
 
   def indexedWrite(name: Integer, elementSize: Integer, data: RDD[(Long, Array[Byte])]): Unit = {
     val size = addressTable.sizeOf(name) / elementSize
-    val indexes = data.keys.coalesce(1)
+    val indexes = data.keys
     val missing = sc.parallelize(0.toLong to size-1).subtract(indexes).map{ x => (x, Array.fill[Byte](elementSize)(0)) }
     val all = missing.++(data)
     fs.write(name, all.sortByKey(true).values.collect.flatten)
