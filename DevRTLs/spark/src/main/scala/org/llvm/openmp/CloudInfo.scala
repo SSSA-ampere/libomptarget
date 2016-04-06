@@ -106,7 +106,7 @@ class AddressTable(csv : String) {
 
 class CloudInfo(var filesystem: String, var uri: String, var username: String, var path: String) {
 
-  val conf = new SparkConf()
+  val conf = new SparkConf().set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   val sc = new SparkContext(conf)
 
   // Initialize file system according to the provider
