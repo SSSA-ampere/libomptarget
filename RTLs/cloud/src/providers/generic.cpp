@@ -153,9 +153,16 @@ int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
 }
 
 int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id) {
+  int retval;
   std::string filename = hdfs.WorkingDir + std::to_string(id);
 
   DP("Reading data from file '%s'\n", filename.c_str());
+
+  hdfsFileInfo *fileInfo = hdfsGetPathInfo(fs, filename.c_str());
+  if (fileInfo->mSize != size) {
+    DP("Wrong file size: %d instead of %d\n", fileInfo->mSize, size);
+    return OFFLOAD_FAIL;
+  }
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_RDONLY, 0, 0, 0);
   if(file == NULL) {
@@ -163,11 +170,18 @@ int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t siz
     return OFFLOAD_FAIL;
   }
 
-  int retval = hdfsRead(fs, file, hst_ptr, size);
+  // Retrieve data by packet
+  char *buffer = (char *) hst_ptr;
+  do {
+    retval = hdfsRead(fs, file, buffer, 4096);
+    buffer = &buffer[4096];
+  } while(retval == 4096);
+
   if(retval < 0) {
     DP("Reading failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
+
 
   retval = hdfsCloseFile(fs, file);
   if(retval < 0) {
