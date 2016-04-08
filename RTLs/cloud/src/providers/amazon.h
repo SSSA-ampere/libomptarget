@@ -1,3 +1,16 @@
+//===-------- amazon.h----- - Information about Target RTLs ------ C++ -*-===//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+//
+// Interface for amazon provider of Cloud RTL
+//
+//===----------------------------------------------------------------------===//
+
 #ifndef _INCLUDE_AMAZON_H_
 #define _INCLUDE_AMAZON_H_
 

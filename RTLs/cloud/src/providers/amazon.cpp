@@ -1,3 +1,16 @@
+//===-------------------- Target RTLs Implementation -------------- C++ -*-===//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+//
+// RTL for Apache Spark cloud cluster
+//
+//===----------------------------------------------------------------------===//
+
 #include <hdfs.h>
 #include <libssh/libssh.h>
 #include <stdio.h>
