@@ -17,6 +17,7 @@ import com.amazonaws.services.s3.model.ObjectMetadata
 import org.apache.spark.SparkFiles
 import com.amazonaws.util.IOUtils
 import java.util.HashMap
+import java.util.Arrays
 
 abstract class CloudFileSystem(val name: String) {
 
@@ -128,11 +129,10 @@ class CloudInfo(var filesystem: String, var uri: String, var username: String, v
   }
 
   def indexedWrite(name: Integer, elementSize: Integer, data: RDD[(Long, Array[Byte])]): Unit = {
-    val size = addressTable.sizeOf(name) / elementSize
-    val indexes = data.keys
-    val missing = sc.parallelize(0.toLong to size-1).subtract(indexes).map{ x => (x, Array.fill[Byte](elementSize)(0)) }
-    val all = missing.++(data)
-    fs.write(name, all.sortByKey(true).values.collect.flatten)
+    val totalSize = addressTable.sizeOf(name)
+    val bytes = Array.fill[Byte](totalSize)(0)
+    data.collect.foreach(x => Array.copy(x._2, 0, bytes, x._1.toInt*elementSize, elementSize))
+    fs.write(name, bytes)
   }
 
   def readRDD(id: Integer, size: Integer): RDD[Array[Byte]] = {
