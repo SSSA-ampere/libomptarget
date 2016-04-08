@@ -1,13 +1,13 @@
 #include <hdfs.h>
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "INIReader.h"
-#include "omptarget.h"
 #include "../rtl.h"
+#include "INIReader.h"
 #include "generic.h"
 #include "google.h"
+#include "omptarget.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
@@ -15,12 +15,13 @@
 
 #define GETNAME2(name) #name
 #define GETNAME(name) GETNAME2(name)
-#define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Google Provider:", __VA_ARGS__)
+#define DP(...)                                                                \
+  DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Google Provider:", __VA_ARGS__)
 
 int32_t GoogleProvider::parse_config(INIReader reader) {
-  GoogleInfo info {
-    reader.Get("GoogleProvider", "Bucket", ""),
-    reader.Get("GoogleProvider", "Cluster", ""),
+  GoogleInfo info{
+      reader.Get("GoogleProvider", "Bucket", ""),
+      reader.Get("GoogleProvider", "Cluster", ""),
   };
 
   ginfo = info;
@@ -28,7 +29,8 @@ int32_t GoogleProvider::parse_config(INIReader reader) {
   return OFFLOAD_SUCCESS;
 }
 
-int32_t GoogleProvider::send_file(const char *filename, const char *tgtfilename) {
+int32_t GoogleProvider::send_file(const char *filename,
+                                  const char *tgtfilename) {
   std::string command = "gsutil cp ";
 
   command += std::string(filename);
@@ -43,7 +45,8 @@ int32_t GoogleProvider::send_file(const char *filename, const char *tgtfilename)
   return OFFLOAD_SUCCESS;
 }
 
-int32_t GoogleProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id) {
+int32_t GoogleProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
+                                    int32_t id) {
   // Creating temporary file to hold data to submit
   char tmp_name[] = "/tmp/tmpfile_XXXXXX";
   int tmp_fd = mkstemp(tmp_name);
@@ -74,7 +77,8 @@ int32_t GoogleProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size, 
   return send_file(tmp_name, final_filename.c_str());
 }
 
-int32_t GoogleProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id) {
+int32_t GoogleProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
+                                      int64_t size, int32_t id) {
   // Creating temporary file to hold data retrieved
   char tmp_name[] = "/tmp/tmpfile_XXXXXX";
   int tmp_fd = mkstemp(tmp_name);
@@ -138,7 +142,8 @@ int32_t GoogleProvider::submit_job() {
   command += " ";
   command += "--class " + spark.Package;
   command += " ";
-  command += "--jars " + ginfo.Bucket + hdfs.WorkingDir + "test-assembly-0.1.0.jar";
+  command +=
+      "--jars " + ginfo.Bucket + hdfs.WorkingDir + "test-assembly-0.1.0.jar";
 
   // Execution arguments pass to the spark kernel
   if (hdfs.ServAddress.find("://") == std::string::npos) {

@@ -1,17 +1,17 @@
 #include <hdfs.h>
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <thread>
 
-#include "INIReader.h"
-#include "omptarget.h"
 #include "../rtl.h"
+#include "INIReader.h"
 #include "generic.h"
+#include "omptarget.h"
 
 #include "rapidjson/document.h"
-#include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 #include "restclient-cpp/restclient.h"
 
 #ifndef TARGET_NAME
@@ -20,7 +20,8 @@
 
 #define GETNAME2(name) #name
 #define GETNAME(name) GETNAME2(name)
-#define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Generic Provider:", __VA_ARGS__)
+#define DP(...)                                                                \
+  DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Generic Provider:", __VA_ARGS__)
 
 GenericProvider *createGenericProvider(ResourceInfo &resources) {
   return new GenericProvider(resources);
@@ -41,25 +42,26 @@ int32_t GenericProvider::init_device() {
   fs = hdfsBuilderConnect(builder);
 
   if (fs == NULL) {
-    DP("Connection problem with HDFS cluster. Check your configuration in 'cloud_rtl.ini'.\n");
+    DP("Connection problem with HDFS cluster. Check your configuration in "
+       "'cloud_rtl.ini'.\n");
     return OFFLOAD_FAIL;
   }
 
   hdfsFreeBuilder(builder);
 
-  if(hdfsExists(fs, hdfs.WorkingDir.c_str()) < 0) {
+  if (hdfsExists(fs, hdfs.WorkingDir.c_str()) < 0) {
     retval = hdfsCreateDirectory(fs, hdfs.WorkingDir.c_str());
-    if(retval < 0) {
+    if (retval < 0) {
       DP("%s", hdfsGetLastError());
       return OFFLOAD_FAIL;
     }
   }
 
-
   return OFFLOAD_SUCCESS;
 }
 
-int32_t GenericProvider::send_file(const char *filename, const char *tgtfilename) {
+int32_t GenericProvider::send_file(const char *filename,
+                                   const char *tgtfilename) {
   std::string final_name = hdfs.WorkingDir + std::string(tgtfilename);
 
   DP("submitting file %s as %s\n", filename, final_name.c_str());
@@ -71,7 +73,7 @@ int32_t GenericProvider::send_file(const char *filename, const char *tgtfilename
     return OFFLOAD_FAIL;
   }
 
-  std::ifstream hstfile(filename, std::ios::in|std::ios::binary);
+  std::ifstream hstfile(filename, std::ios::in | std::ios::binary);
 
   if (!hstfile.is_open()) {
     DP("Opening host file %s failed.", filename);
@@ -125,7 +127,8 @@ void *GenericProvider::data_alloc(int64_t size, int32_t type, int32_t id) {
   return (void *)currAddr++;
 }
 
-int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id) {
+int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
+                                     int32_t id) {
   // Since we now need the hdfs file, we create it here
   std::string filename = hdfs.WorkingDir + std::to_string(id);
   DP("Submitting data to file %s\n", filename.c_str());
@@ -152,7 +155,8 @@ int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
   return OFFLOAD_SUCCESS;
 }
 
-int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id) {
+int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
+                                       int64_t size, int32_t id) {
   int retval;
   std::string filename = hdfs.WorkingDir + std::to_string(id);
 
@@ -165,26 +169,25 @@ int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t siz
   }
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_RDONLY, 0, 0, 0);
-  if(file == NULL) {
+  if (file == NULL) {
     DP("Opening failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
   // Retrieve data by packet
-  char *buffer = (char *) hst_ptr;
+  char *buffer = (char *)hst_ptr;
   do {
     retval = hdfsRead(fs, file, buffer, 4096);
     buffer = &buffer[4096];
-  } while(retval == 4096);
+  } while (retval == 4096);
 
-  if(retval < 0) {
+  if (retval < 0) {
     DP("Reading failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
 
-
   retval = hdfsCloseFile(fs, file);
-  if(retval < 0) {
+  if (retval < 0) {
     DP("Closing failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
@@ -198,7 +201,7 @@ int32_t GenericProvider::data_delete(void *tgt_ptr, int32_t id) {
   DP("Deleting file '%s'\n", filename.c_str());
 
   int retval = hdfsDelete(fs, filename.c_str(), 0);
-  if(retval < 0) {
+  if (retval < 0) {
     DP("Deleting file failed.\n%s", hdfsGetLastError());
     return OFFLOAD_FAIL;
   }
@@ -208,7 +211,7 @@ int32_t GenericProvider::data_delete(void *tgt_ptr, int32_t id) {
 
 int32_t GenericProvider::submit_job() {
   int32_t res;
-  if(spark.Mode == SparkMode::cluster) {
+  if (spark.Mode == SparkMode::cluster) {
     res = submit_cluster();
   } else {
     res = submit_local();
@@ -235,8 +238,10 @@ int32_t GenericProvider::submit_cluster() {
   // Structure of a request to create a Spark Job:
   // {
   //   "action" : "CreateSubmissionRequest",
-  //   "appArgs" : [ "hdfs://10.68.254.1:8020", "bernardo.stein", "/user/bernardo/cloud_test/" ],
-  //   "appResource" : "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar",
+  //   "appArgs" : [ "hdfs://10.68.254.1:8020", "bernardo.stein",
+  //   "/user/bernardo/cloud_test/" ],
+  //   "appResource" :
+  //   "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar",
   //   "clientSparkVersion" : "1.4.0",
   //   "environmentVariables" : {
   //     "SPARK_SCALA_VERSION" : "2.10",
@@ -248,7 +253,8 @@ int32_t GenericProvider::submit_cluster() {
   //     "spark.driver.supervise" : "false",
   //     "spark.master" : "spark://10.68.254.1:6066",
   //     "spark.app.name" : "org.llvm.openmp.OmpKernel",
-  //     "spark.jars" : "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar"
+  //     "spark.jars" :
+  //     "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar"
   //   }
   // }
   // TODO: Maybe move those string constructions to the init functions
@@ -302,20 +308,24 @@ int32_t GenericProvider::submit_cluster() {
   DP("Creating JSON structure\n");
   rapidjson::Document d;
   d.SetObject();
-  rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
+  rapidjson::Document::AllocatorType &allocator = d.GetAllocator();
 
   d.AddMember("action", "CreateSubmissionRequest", allocator);
 
   rapidjson::Value appArgs;
   appArgs.SetArray();
   appArgs.PushBack(rapidjson::Value(hdfsAddress.c_str(), allocator), allocator);
-  appArgs.PushBack(rapidjson::Value(hdfs.UserName.c_str(), allocator), allocator);
-  appArgs.PushBack(rapidjson::Value(hdfs.WorkingDir.c_str(), allocator), allocator);
+  appArgs.PushBack(rapidjson::Value(hdfs.UserName.c_str(), allocator),
+                   allocator);
+  appArgs.PushBack(rapidjson::Value(hdfs.WorkingDir.c_str(), allocator),
+                   allocator);
   d.AddMember("appArgs", appArgs, allocator);
 
-  d.AddMember("appResource", rapidjson::Value(hdfsResource.c_str(), allocator), allocator);
+  d.AddMember("appResource", rapidjson::Value(hdfsResource.c_str(), allocator),
+              allocator);
   d.AddMember("clientSparkVersion", "1.5.0", allocator);
-  d.AddMember("mainClass", rapidjson::Value(spark.Package.c_str(), allocator), allocator);
+  d.AddMember("mainClass", rapidjson::Value(spark.Package.c_str(), allocator),
+              allocator);
 
   rapidjson::Value environmentVariables;
   environmentVariables.SetObject();
@@ -324,16 +334,24 @@ int32_t GenericProvider::submit_cluster() {
   rapidjson::Value sparkProperties;
   sparkProperties.SetObject();
   sparkProperties.AddMember("spark.driver.supervise", "false", allocator);
-  sparkProperties.AddMember("spark.master", rapidjson::Value(sparkAddress.c_str(), allocator), allocator);
-  sparkProperties.AddMember("spark.app.name", rapidjson::Value(spark.Package.c_str(), allocator), allocator);
-  sparkProperties.AddMember("spark.jars", rapidjson::Value(hdfsResource.c_str(), allocator), allocator);
+  sparkProperties.AddMember("spark.master",
+                            rapidjson::Value(sparkAddress.c_str(), allocator),
+                            allocator);
+  sparkProperties.AddMember("spark.app.name",
+                            rapidjson::Value(spark.Package.c_str(), allocator),
+                            allocator);
+  sparkProperties.AddMember("spark.jars",
+                            rapidjson::Value(hdfsResource.c_str(), allocator),
+                            allocator);
   d.AddMember("sparkProperties", sparkProperties, allocator);
 
   rapidjson::StringBuffer buffer;
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
   d.Accept(writer);
 
-  RestClient::response r = RestClient::post(sparkRESTAddress + "/v1/submissions/create", "text/json", buffer.GetString());
+  RestClient::response r =
+      RestClient::post(sparkRESTAddress + "/v1/submissions/create", "text/json",
+                       buffer.GetString());
   std::string driverid = "";
 
   if (r.code == 200) {
@@ -359,7 +377,8 @@ int32_t GenericProvider::submit_cluster() {
   do {
     // Now polling the REST server until we get a good result
     DP("Requesting result from REST server\n");
-    r = RestClient::get(sparkRESTAddress + "/v1/submissions/status/" + driverid);
+    r = RestClient::get(sparkRESTAddress + "/v1/submissions/status/" +
+                        driverid);
 
     if (r.code == 200) {
       // Check if finished
@@ -371,9 +390,11 @@ int32_t GenericProvider::submit_cluster() {
       assert(answer.HasMember("success"));
 
       if (!strcmp(answer["driverState"].GetString(), "RUNNING")) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(spark.PollInterval));
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(spark.PollInterval));
         continue;
-      } else if (!strcmp(answer["driverState"].GetString(), "FINISHED") && answer["success"].GetBool()) {
+      } else if (!strcmp(answer["driverState"].GetString(), "FINISHED") &&
+                 answer["success"].GetBool()) {
         DP("Got response: SUCCEED!\n");
         return OFFLOAD_SUCCESS;
       } else {
@@ -389,15 +410,13 @@ int32_t GenericProvider::submit_cluster() {
   } while (true);
 
   return OFFLOAD_FAIL;
-
 }
 
-int32_t GenericProvider::submit_local(){
+int32_t GenericProvider::submit_local() {
   std::string cmd = "spark-submit";
 
   // Spark job entry point
   cmd += " --class " + spark.Package + " " + spark.JarPath;
-
 
   // Execution arguments pass to the spark kernel
   cmd += " " + get_job_args();
@@ -439,7 +458,8 @@ std::string GenericProvider::get_job_args() {
   return args;
 }
 
-int32_t GenericProvider::execute_command(const char *command, bool print_result) {
+int32_t GenericProvider::execute_command(const char *command,
+                                         bool print_result) {
   DP("Executing command: %s\n", command);
 
   FILE *fp = popen(command, "r");

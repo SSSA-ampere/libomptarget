@@ -2,25 +2,25 @@
 #define _INCLUDE_RTL_H
 
 #include <assert.h>
-#include <vector>
-#include <stdio.h>
-#include <stdlib.h>
-#include <iostream>
 #include <fstream>
 #include <hdfs.h>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <vector>
 
-#include "omptarget.h"
 #include "INIReader.h"
+#include "omptarget.h"
 
 class GenericProvider;
 
 /// Array of Dynamic libraries loaded for this target
 struct DynLibTy {
   char *FileName;
-  void* Handle;
+  void *Handle;
 };
 
-struct HdfsInfo{
+struct HdfsInfo {
   std::string ServAddress;
   int ServPort;
   std::string UserName;
@@ -30,7 +30,7 @@ struct HdfsInfo{
 
 enum SparkMode { client, cluster, invalid };
 
-struct SparkInfo{
+struct SparkInfo {
   std::string ServAddress;
   int ServPort;
   SparkMode Mode;
@@ -72,7 +72,7 @@ struct ProviderListEntry {
 #define DEFAULT_PROXY_TYPE ""
 
 /// Keep entries table per device
-struct FuncOrGblEntryTy{
+struct FuncOrGblEntryTy {
   __tgt_target_table Table;
 };
 
@@ -87,11 +87,12 @@ public:
   std::vector<SparkInfo> SparkClusters;
   ProxyInfo ProxyOptions;
   std::vector<hdfsFS> HdfsNodes;
-  std::vector<GenericProvider*> Providers;
+  std::vector<GenericProvider *> Providers;
   std::vector<std::string> AddressTables;
 
   // Record entry point associated with device
-  void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin, __tgt_offload_entry *end);
+  void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin,
+                          __tgt_offload_entry *end);
   // Return true if the entry is associated with device
   bool findOffloadEntry(int32_t device_id, void *addr);
   // Return the pointer to the target entries table
