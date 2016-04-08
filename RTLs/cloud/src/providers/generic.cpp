@@ -416,6 +416,7 @@ int32_t GenericProvider::submit_local() {
   std::string cmd = "spark-submit";
 
   // Spark job entry point
+  cmd += " " + spark.AdditionalArgs;
   cmd += " --class " + spark.Package + " " + spark.JarPath;
 
   // Execution arguments pass to the spark kernel
