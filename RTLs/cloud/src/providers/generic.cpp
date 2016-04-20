@@ -441,7 +441,7 @@ int32_t GenericProvider::submit_local() {
   // Execution arguments pass to the spark kernel
   cmd += " " + get_job_args();
 
-  if (!execute_command(cmd.c_str(), true)) {
+  if (execute_command(cmd.c_str(), true)) {
     return OFFLOAD_FAIL;
   }
 
@@ -486,7 +486,7 @@ int32_t GenericProvider::execute_command(const char *command,
 
   if (fp == NULL) {
     DP("Failed to execute command.\n");
-    return 0;
+    return EXIT_FAILURE;
   }
 
   if (print_result) {
@@ -502,5 +502,5 @@ int32_t GenericProvider::execute_command(const char *command,
     DP("%s", buf);
   }
 
-  return 1;
+  return pclose(fp);
 }
