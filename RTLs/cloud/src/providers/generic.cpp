@@ -175,6 +175,12 @@ int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
 
   DP("Reading data from file '%s'\n", filename.c_str());
 
+  retval = hdfsExists(fs, filename.c_str());
+  if(retval < 0) {
+    DP("File does not exist\n");
+    return OFFLOAD_FAIL;
+  }
+
   hdfsFileInfo *fileInfo = hdfsGetPathInfo(fs, filename.c_str());
   if (fileInfo->mSize != size) {
     DP("Wrong file size: %d instead of %d\n", fileInfo->mSize, size);
