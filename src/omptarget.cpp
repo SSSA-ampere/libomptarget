@@ -918,8 +918,10 @@ static int target(int32_t device_id, void *host_ptr, int32_t arg_num,
 
   //Move data to device
   res = target_data_begin(Device, arg_num, args_base, args, arg_sizes, arg_types, arg_ids);
-  if (res != OFFLOAD_SUCCESS)
+  if (res != OFFLOAD_SUCCESS) {
+    DP("ERROR = Input data mapping failed\n")
     return OFFLOAD_FAIL;
+  }
 
   std::vector<void*> tgt_args;
 
@@ -959,13 +961,17 @@ static int target(int32_t device_id, void *host_ptr, int32_t arg_num,
       &tgt_args[0], tgt_args.size());
   }
 
-  if (res != OFFLOAD_SUCCESS)
+  if (res != OFFLOAD_SUCCESS) {
+    DP("ERROR = Offload execution failed\n")
     return OFFLOAD_FAIL;
+  }
 
   //Move data from device
   res = target_data_end(Device, arg_num, args_base, args, arg_sizes, arg_types, arg_ids);
-  if (res != OFFLOAD_SUCCESS)
+  if (res != OFFLOAD_SUCCESS) {
+    DP("ERROR = Output data mapping failed\n")
     return OFFLOAD_FAIL;
+  }
 
   return OFFLOAD_SUCCESS;
 }
