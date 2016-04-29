@@ -24,22 +24,27 @@ object Util {
   }
   
   def bitor(x: Array[Byte], y: Array[Byte]) : Array[Byte] = {
-    val bx = ByteBuffer.wrap(x).array()
-    val by = ByteBuffer.wrap(y).array()
-    for(i <- 0 to bx.size-1) {
-      bx(i) = (bx(i) | by(i)).toByte
+    var i = 0
+    while (i < x.length) {
+      x(i) = (x(i) | y(i)).toByte
+      i += 1
     }
-    return bx
+    return x
+  }
+  
+  def bitor(x: Array[Long], y: Array[Long]) : Array[Long] = {
+    var i = 0
+    while (i < x.length) {
+      x(i) = (x(i) | y(i))
+      i += 1
+    }
+    return x
   }
   
   def bitor2(x: Array[Byte], y: Array[Byte]) : Array[Byte] = {
-    (x.toStream zip y.toStream).map{ case (a,b) => (a|b).toByte }.toArray
-  }
-  
-  def bitor3(x: Array[Byte], y: Array[Byte]) : Array[Byte] = {
-    val bx = ByteBuffer.wrap(x).asIntBuffer().array()
-    val by = ByteBuffer.wrap(y).asIntBuffer().array()
-    val hi = (bx.toStream zip by.toStream).map{ case (a,b) => (a|b) }.toArray
+    for(i <- 0 to x.size-1) {
+      x(i) = (x(i) | y(i)).toByte
+    }
     return x
   }
 
