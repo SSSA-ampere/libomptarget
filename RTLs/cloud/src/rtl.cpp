@@ -61,7 +61,13 @@ static std::vector<struct ProviderListEntry> ProviderList;
 static RTLDeviceInfoTy DeviceInfo;
 
 RTLDeviceInfoTy::RTLDeviceInfoTy() {
-  INIReader reader(DEFAULT_CLOUD_RTL_CONF_FILE);
+
+  const char* conf_filename = getenv("CLOUD_CONF_PATH");
+  if(conf_filename == NULL) {
+    conf_filename = DEFAULT_CLOUD_RTL_CONF_FILE;
+  }
+
+  INIReader reader(conf_filename);
 
   NumberOfDevices = 0;
 
@@ -157,11 +163,16 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 
   DP("Initializing device %d\n", device_id);
 
+  const char* conf_filename = getenv("CLOUD_CONF_PATH");
+  if(conf_filename == NULL) {
+    conf_filename = DEFAULT_CLOUD_RTL_CONF_FILE;
+  }
+
   // Parsing configurations
-  INIReader reader(DEFAULT_CLOUD_RTL_CONF_FILE);
+  INIReader reader(conf_filename);
 
   if (reader.ParseError() < 0) {
-    DP("Couldn't find '%s'!", DEFAULT_CLOUD_RTL_CONF_FILE);
+    DP("Couldn't find '%s'!", conf_filename);
     return OFFLOAD_FAIL;
   }
 
@@ -388,6 +399,8 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type,
     std::ofstream ofs(DeviceInfo.AddressTables[device_id], std::ios_base::app);
     ofs << id << ";" << size << ";" << std::endl;
     ofs.close();
+
+    DP("Adding '%d' of size %ld to the address table\n", id, size);
   }
 
   return DeviceInfo.Providers[device_id]->data_alloc(size, type, id);
