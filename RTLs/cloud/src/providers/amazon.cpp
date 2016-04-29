@@ -74,7 +74,7 @@ int32_t AmazonProvider::send_file(const char *filename,
   command += " " + get_cloud_path(std::string(tgtfilename));
   command += " " + get_keys();
 
-  if (!execute_command(command.c_str(), true)) {
+  if (execute_command(command.c_str(), true)) {
     return OFFLOAD_FAIL;
   }
 
@@ -125,7 +125,7 @@ int32_t AmazonProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
   command += get_cloud_path(std::to_string(id));
   command += " " + std::string(tmp_name) + " " + get_keys();
 
-  if (!execute_command(command.c_str(), true)) {
+  if (execute_command(command.c_str(), true)) {
     return OFFLOAD_FAIL;
   }
 
@@ -152,7 +152,7 @@ int32_t AmazonProvider::data_delete(void *tgt_ptr, int32_t id) {
 
   command += get_cloud_path(std::to_string(id)) + " " + get_keys();
 
-  if (!execute_command(command.c_str(), true)) {
+  if (execute_command(command.c_str(), true)) {
     return OFFLOAD_FAIL;
   }
 
