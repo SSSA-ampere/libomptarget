@@ -239,6 +239,23 @@ int32_t GenericProvider::submit_job() {
 }
 
 int32_t GenericProvider::submit_cluster() {
+  std::string cmd = "spark-submit --master spark://" +
+      spark.ServAddress + ":" + std::to_string(spark.ServPort);
+
+  // Spark job entry point
+
+  cmd += " " + spark.AdditionalArgs;
+  cmd += " --class " + spark.Package + " " + spark.JarPath;
+
+  // Execution arguments pass to the spark kernel
+  cmd += " " + get_job_args();
+
+  if (execute_command(cmd.c_str(), true)) {
+    return OFFLOAD_FAIL;
+  }
+
+  return OFFLOAD_SUCCESS;
+
   // Checking if proxy option is set. If it is, set it already
   /*
   if (proxy.HostName != "") {
@@ -251,7 +268,7 @@ int32_t GenericProvider::submit_cluster() {
     uri += ":" + std::to_string(proxy.Port);
 
     RestClient::setProxy(uri, proxy.Type);
-  }*/
+  }
 
   // Creating JSON request
   // Structure of a request to create a Spark Job:
@@ -428,7 +445,7 @@ int32_t GenericProvider::submit_cluster() {
     }
   } while (true);
 
-  return OFFLOAD_FAIL;
+  return OFFLOAD_FAIL;*/
 }
 
 int32_t GenericProvider::submit_local() {
