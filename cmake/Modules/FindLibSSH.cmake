@@ -31,11 +31,11 @@ SET(LIBSSH_SEARCH_PATHS
 
 find_path(LIBSSH_INCLUDE_DIR
     NAMES
-        libssh.h
+        libssh/libssh.h
     PATHS
         ${LIBSSH_SEARCH_PATHS}
     PATH_SUFFIXES
-        include/libssh include
+        include
 )
 
 find_library(SSH_LIBRARY
