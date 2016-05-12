@@ -16,6 +16,8 @@
 
 #include "../rtl.h"
 #include "INIReader.h"
+
+#include "../util/ssh.h"
 #include "generic.h"
 
 struct AmazonInfo {

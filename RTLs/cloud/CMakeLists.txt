@@ -17,12 +17,11 @@ find_package(HDFS3 QUIET)
 find_package(CURL QUIET)
 find_package(LibSSH QUIET)
 
-
 if(CURL_FOUND AND HDFS3_FOUND AND LIBSSH_FOUND)
 
     message("Building cloud target RTL")
 
-    include_directories(inih rapidjson restclient ${CURL_INCLUDE_DIR} ${HDFS3_INCLUDE_DIR} ${LIBELF_INCLUDE_DIRS} ${LIBSSH_INCLUDE_DIRS})
+    include_directories(inih rapidjson restclient util ${CURL_INCLUDE_DIR} ${HDFS3_INCLUDE_DIR} ${LIBELF_INCLUDE_DIRS} ${LIBSSH_INCLUDE_DIRS})
 
     add_library(inih SHARED inih/ini.c inih/INIReader.cpp)
 
@@ -32,7 +31,15 @@ if(CURL_FOUND AND HDFS3_FOUND AND LIBSSH_FOUND)
         add_library(restclient SHARED restclient/restclient.cpp)
     endif()
 
-    add_library(omptarget.rtl.cloud SHARED src/rtl.cpp src/providers/amazon.cpp src/providers/generic.cpp src/providers/google.cpp)
+    add_library(
+        omptarget.rtl.cloud SHARED
+        src/rtl.cpp
+        src/providers/amazon.cpp
+        src/providers/generic.cpp
+        src/providers/google.cpp
+        src/util/ssh.cpp
+    )
+
     target_link_libraries(omptarget.rtl.cloud
       inih
       restclient
