@@ -22,11 +22,6 @@
 #include "generic.h"
 #include "omptarget.h"
 
-#include "rapidjson/document.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/writer.h"
-#include "restclient-cpp/restclient.h"
-
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
 #endif
