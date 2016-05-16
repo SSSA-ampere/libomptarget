@@ -161,14 +161,10 @@ int32_t AmazonProvider::data_delete(void *tgt_ptr, int32_t id) {
 int32_t AmazonProvider::submit_job() {
   int32_t rc;
 
+  // init ssh session
   ssh_session aws_session = ssh_new();
   int verbosity = SSH_LOG_NOLOG;
   int port = 22;
-
-  ssh_channel channel;
-
-  char buffer[256];
-  int nbytes;
 
   if (aws_session == NULL)
     exit(-1);
@@ -177,21 +173,19 @@ int32_t AmazonProvider::submit_job() {
   ssh_options_set(aws_session, SSH_OPTIONS_USER, "root");
   ssh_options_set(aws_session, SSH_OPTIONS_LOG_VERBOSITY, &verbosity);
   ssh_options_set(aws_session, SSH_OPTIONS_PORT, &port);
-  // ssh_options_set(aws_session, SSH_OPTIONS_ADD_IDENTITY,
-  // ainfo.KeyFile.c_str());
 
   rc = ssh_connect(aws_session);
   if (rc != SSH_OK) {
     fprintf(stderr, "Error connecting to server: %s\n",
             ssh_get_error(aws_session));
-    exit(-1);
+    return OFFLOAD_FAIL;
   }
 
   // Verify the server's identity
-  if (verify_knownhost(aws_session) < 0) {
+  if (ssh_verify_knownhost(aws_session) < 0) {
     ssh_disconnect(aws_session);
     ssh_free(aws_session);
-    exit(-1);
+    return OFFLOAD_FAIL;
   }
 
   ssh_key pkey;
@@ -200,86 +194,9 @@ int32_t AmazonProvider::submit_job() {
   ssh_userauth_publickey(aws_session, "root", pkey);
 
   // Copy jar file
-  // Reading contents of the jar file
-
-  FILE *fjar = fopen(spark.JarPath.c_str(), "rb");
-  // fseek(fjar, 0, SEEK_END); // seek to end of file
-  // size_t size = ftell(fjar); // get current file pointer
-  // fseek(fjar, 0, SEEK_SET); // seek back to beginning of file
-
-  int fd = fileno(
-      fjar); // if you have a stream (e.g. from fopen), not a file descriptor.
-  struct stat sjar;
-  fstat(fd, &sjar);
-  int size = sjar.st_size;
-
-  DP("Size => %d.\n", size);
-
-  void *fbuffer = malloc(size * sizeof(char));
-
-  if (!fjar) {
-    DP("Could not open temporary file.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  ssh_scp scp;
-  scp = ssh_scp_new(aws_session, SSH_SCP_WRITE, "/root/");
-  if (scp == NULL) {
-    fprintf(stderr, "Error allocating scp session: %s\n",
-            ssh_get_error(aws_session));
-    return SSH_ERROR;
-  }
-
-  rc = ssh_scp_init(scp);
-  if (rc != SSH_OK) {
-    fprintf(stderr, "Error initializing scp session: %s\n",
-            ssh_get_error(aws_session));
-    ssh_scp_free(scp);
-    return rc;
-  }
-
-  /*
-  rc = ssh_scp_push_directory(scp, spark., S_IRWXU);
-  if (rc != SSH_OK)
-  {
-    fprintf(stderr, "Can't create remote directory: %s\n",
-            ssh_get_error(aws_session));
-    return rc;
-  }*/
-
-  rc = ssh_scp_push_file(scp, "spark_job.jar", size, S_IRUSR | S_IWUSR);
-  if (rc != SSH_OK) {
-    fprintf(stderr, "Can't open remote file: %s\n", ssh_get_error(aws_session));
-    return rc;
-  }
-
-  if (fread(fbuffer, 1, size, fjar) != size) {
-    DP("Could not successfully read temporary file.\n");
-    fclose(fjar);
-    return OFFLOAD_FAIL;
-  }
-
-  rc = ssh_scp_write(scp, fbuffer, size);
-  if (rc != SSH_OK) {
-    fprintf(stderr, "Can't write to remote file: %s\n",
-            ssh_get_error(aws_session));
-    return rc;
-  }
-
-  fclose(fjar);
-  ssh_scp_close(scp);
-  ssh_scp_free(scp);
+  ssh_copy(aws_session, spark.JarPath.c_str(), "/root/", "spark_job.jar");
 
   // Run Spark
-  channel = ssh_channel_new(aws_session);
-  if (channel == NULL)
-    return SSH_ERROR;
-  rc = ssh_channel_open_session(channel);
-  if (rc != SSH_OK) {
-    ssh_channel_free(channel);
-    return rc;
-  }
-
   std::string cmd = "export AWS_ACCESS_KEY_ID=" + ainfo.AccessKey +
                     " && export AWS_SECRET_ACCESS_KEY=" + ainfo.SecretKey +
                     " && ./spark/bin/spark-submit --master spark://" +
@@ -289,33 +206,7 @@ int32_t AmazonProvider::submit_job() {
 
   DP("Executing SSH command: %s\n", cmd.c_str());
 
-  rc = ssh_channel_request_exec(channel, cmd.c_str());
-
-  if (rc != SSH_OK) {
-    ssh_channel_close(channel);
-    ssh_channel_free(channel);
-    return rc;
-  }
-
-  nbytes = ssh_channel_read(channel, buffer, sizeof(buffer), 1);
-  while (nbytes > 0) {
-    if (fwrite(buffer, 1, nbytes, stdout) != (unsigned int)nbytes) {
-      ssh_channel_close(channel);
-      ssh_channel_free(channel);
-      return SSH_ERROR;
-    }
-    nbytes = ssh_channel_read(channel, buffer, sizeof(buffer), 1);
-  }
-
-  if (nbytes < 0) {
-    ssh_channel_close(channel);
-    ssh_channel_free(channel);
-    return SSH_ERROR;
-  }
-
-  ssh_channel_send_eof(channel);
-  ssh_channel_close(channel);
-  ssh_channel_free(channel);
+  rc = ssh_run(aws_session, cmd.c_str());
 
   ssh_disconnect(aws_session);
   ssh_free(aws_session);

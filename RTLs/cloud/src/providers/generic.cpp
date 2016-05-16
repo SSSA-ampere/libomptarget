@@ -16,11 +16,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <thread>
+#include <libssh/libssh.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "../rtl.h"
 #include "INIReader.h"
 #include "generic.h"
 #include "omptarget.h"
+#include "../util/ssh.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
@@ -163,6 +168,8 @@ int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
   return OFFLOAD_SUCCESS;
 }
 
+#define BUFSIZE 8096
+
 int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
                                        int64_t size, int32_t id) {
   int retval;
@@ -184,16 +191,20 @@ int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_RDONLY, 0, 0, 0);
   if (file == NULL) {
-    DP("Opening failed.\n%s", hdfsGetLastError());
+    DP("Opening failed.\n");
     return OFFLOAD_FAIL;
   }
+
 
   // Retrieve data by packet
   char *buffer = (char *)hst_ptr;
   do {
-    retval = hdfsRead(fs, file, buffer, 4096);
-    buffer = &buffer[4096];
-  } while (retval == 4096);
+    retval = hdfsRead(fs, file, buffer, BUFSIZE);
+    buffer = &buffer[BUFSIZE];
+  } while (retval == BUFSIZE);
+
+
+  //retval = hdfsRead(fs, file, hst_ptr, size);
 
   if (retval < 0) {
     DP("Reading failed.\n");
@@ -234,213 +245,68 @@ int32_t GenericProvider::submit_job() {
 }
 
 int32_t GenericProvider::submit_cluster() {
-  std::string cmd = "spark-submit --master spark://" +
-      spark.ServAddress + ":" + std::to_string(spark.ServPort);
+  int32_t rc;
 
-  // Spark job entry point
+  // init ssh session
+  ssh_session session = ssh_new();
+  if (session == NULL)
+    exit(-1);
 
-  cmd += " " + spark.AdditionalArgs;
-  cmd += " --class " + spark.Package + " " + spark.JarPath;
+  int verbosity = SSH_LOG_NOLOG;
+  int port = 22;
 
-  // Execution arguments pass to the spark kernel
-  cmd += " " + get_job_args();
+  ssh_options_set(session, SSH_OPTIONS_HOST, spark.ServAddress.c_str());
+  ssh_options_set(session, SSH_OPTIONS_USER, spark.UserName.c_str());
+  ssh_options_set(session, SSH_OPTIONS_LOG_VERBOSITY, &verbosity);
+  ssh_options_set(session, SSH_OPTIONS_PORT, &port);
 
-  if (execute_command(cmd.c_str(), true)) {
-    return OFFLOAD_FAIL;
+  rc = ssh_connect(session);
+  if (rc != SSH_OK) {
+    fprintf(stderr, "Error connecting to server: %s\n",
+            ssh_get_error(session));
+    return(OFFLOAD_FAIL);
   }
 
-  return OFFLOAD_SUCCESS;
-
-  // Checking if proxy option is set. If it is, set it already
-  /*
-  if (proxy.HostName != "") {
-    std::string uri = proxy.HostName;
-
-    if (uri.back() == '/') {
-      uri.erase(uri.end() - 1);
-    }
-
-    uri += ":" + std::to_string(proxy.Port);
-
-    RestClient::setProxy(uri, proxy.Type);
+  // Verify the server's identity
+  if (ssh_verify_knownhost(session) < 0) {
+    ssh_disconnect(session);
+    ssh_free(session);
+    return(OFFLOAD_FAIL);
   }
 
-  // Creating JSON request
-  // Structure of a request to create a Spark Job:
-  // {
-  //   "action" : "CreateSubmissionRequest",
-  //   "appArgs" : [ "hdfs://10.68.254.1:8020", "bernardo.stein",
-  //   "/user/bernardo/cloud_test/" ],
-  //   "appResource" :
-  //   "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar",
-  //   "clientSparkVersion" : "1.4.0",
-  //   "environmentVariables" : {
-  //     "SPARK_SCALA_VERSION" : "2.10",
-  //     "SPARK_HOME" : "/home/bernardo/projects/spark-1.4.0-bin-hadoop2.6",
-  //     "SPARK_ENV_LOADED" : "1"
-  //   },
-  //   "mainClass" : "org.llvm.openmp.OmpKernel",
-  //   "sparkProperties" : {
-  //     "spark.driver.supervise" : "false",
-  //     "spark.master" : "spark://10.68.254.1:6066",
-  //     "spark.app.name" : "org.llvm.openmp.OmpKernel",
-  //     "spark.jars" :
-  //     "hdfs://10.68.254.1/user/bernardo/cloud_test/test-assembly-0.1.0.jar"
-  //   }
-  // }
-  // TODO: Maybe move those string constructions to the init functions
-  std::string hdfsAddress = "";
-  std::string hdfsResource = "";
-  std::string sparkAddress = "";
-  std::string sparkRESTAddress = "";
-
-  if (hdfs.ServAddress.find("://") == std::string::npos) {
-    hdfsAddress += "hdfs://";
+  rc = ssh_userauth_publickey_auto(session, spark.UserName.c_str(), NULL);
+  if (rc == SSH_AUTH_ERROR)
+  {
+     fprintf(stderr, "Authentication failed: %s\n",
+       ssh_get_error(session));
+     return(OFFLOAD_FAIL);
   }
 
-  hdfsAddress += hdfs.ServAddress;
+  std::string path =  "/home/" + spark.UserName + "/";
 
-  if (hdfs.ServAddress.back() == '/') {
-    hdfsAddress.erase(hdfsAddress.end() - 1);
+  // Copy jar file
+  rc = ssh_copy(session, spark.JarPath.c_str(), path.c_str(), "spark_job.jar");
+  if (rc != SSH_OK) {
+    return(OFFLOAD_FAIL);
   }
 
-  hdfsResource = hdfsAddress;
+  // Run Spark
+  std::string cmd = "./spark-1.5.0-bin-hadoop2.6/bin/spark-submit --master spark://" +
+                    spark.ServAddress + ":" + std::to_string(spark.ServPort) +
+                    " " + spark.AdditionalArgs + " --class " + spark.Package +
+                    " /home/" + spark.UserName + "/spark_job.jar " + get_job_args();
 
-  hdfsAddress += ":";
-  hdfsAddress += std::to_string(hdfs.ServPort);
+  DP("Executing SSH command: %s\n", cmd.c_str());
 
-  hdfsResource += hdfs.WorkingDir;
-  if (hdfsResource.back() != '/') {
-    hdfsResource += "/";
-  }
-  hdfsResource += "test-assembly-0.1.0.jar";
-
-  sparkRESTAddress += "http://";
-
-  if (spark.ServAddress.find("://") == std::string::npos) {
-    sparkAddress += "spark://";
-    sparkRESTAddress += spark.ServAddress;
-  } else {
-    sparkRESTAddress += spark.ServAddress.substr(8);
+  rc = ssh_run(session, cmd.c_str());
+  if (rc != SSH_OK) {
+    return(OFFLOAD_FAIL);
   }
 
-  sparkAddress += spark.ServAddress;
+  ssh_disconnect(session);
+  ssh_free(session);
 
-  if (spark.ServAddress.back() == '/') {
-    sparkAddress.erase(sparkAddress.end() - 1);
-    sparkRESTAddress.erase(sparkRESTAddress.end() - 1);
-  }
-  sparkAddress += ":" + std::to_string(spark.ServPort);
-  sparkRESTAddress += ":" + std::to_string(spark.ServPort);
-
-  // Sending file to HDFS as the library to be loaded
-  send_file(spark.JarPath.c_str(), "test-assembly-0.1.0.jar");
-
-  DP("Creating JSON structure\n");
-  rapidjson::Document d;
-  d.SetObject();
-  rapidjson::Document::AllocatorType &allocator = d.GetAllocator();
-
-  d.AddMember("action", "CreateSubmissionRequest", allocator);
-
-  rapidjson::Value appArgs;
-  appArgs.SetArray();
-  appArgs.PushBack(rapidjson::Value(hdfsAddress.c_str(), allocator), allocator);
-  appArgs.PushBack(rapidjson::Value(hdfs.UserName.c_str(), allocator),
-                   allocator);
-  appArgs.PushBack(rapidjson::Value(hdfs.WorkingDir.c_str(), allocator),
-                   allocator);
-  d.AddMember("appArgs", appArgs, allocator);
-
-  d.AddMember("appResource", rapidjson::Value(hdfsResource.c_str(), allocator),
-              allocator);
-  d.AddMember("clientSparkVersion", "1.5.0", allocator);
-  d.AddMember("mainClass", rapidjson::Value(spark.Package.c_str(), allocator),
-              allocator);
-
-  rapidjson::Value environmentVariables;
-  environmentVariables.SetObject();
-  d.AddMember("environmentVariables", environmentVariables, allocator);
-
-  rapidjson::Value sparkProperties;
-  sparkProperties.SetObject();
-  sparkProperties.AddMember("spark.driver.supervise", "false", allocator);
-  sparkProperties.AddMember("spark.master",
-                            rapidjson::Value(sparkAddress.c_str(), allocator),
-                            allocator);
-  sparkProperties.AddMember("spark.app.name",
-                            rapidjson::Value(spark.Package.c_str(), allocator),
-                            allocator);
-  sparkProperties.AddMember("spark.jars",
-                            rapidjson::Value(hdfsResource.c_str(), allocator),
-                            allocator);
-  d.AddMember("sparkProperties", sparkProperties, allocator);
-
-  rapidjson::StringBuffer buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  d.Accept(writer);
-
-  RestClient::response r =
-      RestClient::post(sparkRESTAddress + "/v1/submissions/create", "text/json",
-                       buffer.GetString());
-  std::string driverid = "";
-
-  if (r.code == 200) {
-    rapidjson::Document answer;
-    answer.Parse(r.body.c_str());
-
-    assert(answer.IsObject());
-    assert(answer.HasMember("success"));
-
-    if (!answer["success"].GetBool()) {
-      DP("Something bad happened when posting request.\n");
-      return OFFLOAD_FAIL;
-    }
-
-    driverid = std::string(answer["submissionId"].GetString());
-  } else {
-    DP("Got response %d from REST server\n", r.code);
-    DP("Answer: %s\n", r.body.c_str());
-
-    return OFFLOAD_FAIL;
-  }
-
-  do {
-    // Now polling the REST server until we get a good result
-    DP("Requesting result from REST server\n");
-    r = RestClient::get(sparkRESTAddress + "/v1/submissions/status/" +
-                        driverid);
-
-    if (r.code == 200) {
-      // Check if finished
-      rapidjson::Document answer;
-      answer.Parse(r.body.c_str());
-
-      assert(answer.IsObject());
-      assert(answer.HasMember("driverState"));
-      assert(answer.HasMember("success"));
-
-      if (!strcmp(answer["driverState"].GetString(), "RUNNING")) {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(spark.PollInterval));
-        continue;
-      } else if (!strcmp(answer["driverState"].GetString(), "FINISHED") &&
-                 answer["success"].GetBool()) {
-        DP("Got response: SUCCEED!\n");
-        return OFFLOAD_SUCCESS;
-      } else {
-        DP("Got response: FAILED!\n");
-        return OFFLOAD_FAIL;
-      }
-    } else {
-      DP("Got response %d from REST server when polling\n", r.code);
-      DP("Answer: %s\n", r.body.c_str());
-
-      return OFFLOAD_FAIL;
-    }
-  } while (true);
-
-  return OFFLOAD_FAIL;*/
+  return rc;
 }
 
 int32_t GenericProvider::submit_local() {
