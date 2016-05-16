@@ -13,14 +13,26 @@
 
 
 
-find_package(HDFS3 QUIET)
+find_package(HDFS QUIET)
+if(NOT HDFS_FOUND)
+    find_package(HDFS3 QUIET)
+    set(HDFS_FOUND HDFS3_FOUND)
+    set(HDFS_INCLUDE_DIR ${HDFS3_INCLUDE_DIR})
+    set(HDFS_LIBRARIES ${HDFS3_LIBRARY})
+endif()
+
 find_package(LibSSH QUIET)
 
-if(HDFS3_FOUND AND LIBSSH_FOUND)
+if((HDFS_FOUND) AND LIBSSH_FOUND)
 
     message("Building cloud target RTL")
 
-    include_directories(inih  util ${HDFS3_INCLUDE_DIR} ${LIBELF_INCLUDE_DIRS} ${LIBSSH_INCLUDE_DIRS})
+    include_directories(
+        inih  util
+        ${HDFS_INCLUDE_DIR}
+        ${LIBELF_INCLUDE_DIRS}
+        ${LIBSSH_INCLUDE_DIRS}
+    )
 
     add_library(inih SHARED inih/ini.c inih/INIReader.cpp)
 
@@ -35,15 +47,15 @@ if(HDFS3_FOUND AND LIBSSH_FOUND)
 
     target_link_libraries(omptarget.rtl.cloud
       inih
-      ${HDFS3_LIBRARY}
+      ${HDFS_LIBRARIES}
       ${LIBELF_LIBRARIES}
       ${LIBSSH_LIBRARIES}
     )
 
 else()
 
-    if(NOT HDFS3_FOUND)
-        message("LibHDFS3 not found in system:")
+    if(NOT HDFS_FOUND)
+        message("LibHDFS not found in system:")
     endif()
     if(NOT LIBSSH_FOUND)
         message("LibSSH not found in system:")

@@ -60,7 +60,7 @@ int32_t GenericProvider::init_device() {
   if (hdfsExists(fs, hdfs.WorkingDir.c_str()) < 0) {
     retval = hdfsCreateDirectory(fs, hdfs.WorkingDir.c_str());
     if (retval < 0) {
-      DP("%s", hdfsGetLastError());
+      DP("Cannot create directory\n");
       return OFFLOAD_FAIL;
     }
   }
@@ -77,7 +77,7 @@ int32_t GenericProvider::send_file(const char *filename,
   hdfsFile file = hdfsOpenFile(fs, final_name.c_str(), O_WRONLY, 0, 0, 0);
 
   if (file == NULL) {
-    DP("Opening file in HDFS failed.\n%s", hdfsGetLastError());
+    DP("Opening file in HDFS failed.\n");
     return OFFLOAD_FAIL;
   }
 
@@ -104,7 +104,7 @@ int32_t GenericProvider::send_file(const char *filename,
     retval = hdfsWrite(fs, file, buffer, hstfile.gcount());
 
     if (retval < 0) {
-      DP("Writing on HDFS failed.\n%s", hdfsGetLastError());
+      DP("Writing on HDFS failed.\n");
       hdfsCloseFile(fs, file);
       return OFFLOAD_FAIL;
     }
@@ -119,7 +119,7 @@ int32_t GenericProvider::send_file(const char *filename,
   retval = hdfsCloseFile(fs, file);
 
   if (retval < 0) {
-    DP("Closing on HDFS failed.\n%s", hdfsGetLastError());
+    DP("Closing on HDFS failed.\n");
     return OFFLOAD_FAIL;
   }
 
@@ -144,19 +144,19 @@ int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
 
   if (file == NULL) {
-    DP("Opening failed.\n%s", hdfsGetLastError());
+    DP("Opening failed.\n");
     return OFFLOAD_FAIL;
   }
 
   int retval = hdfsWrite(fs, file, hst_ptr, size);
   if (retval < 0) {
-    DP("Writing failed.\n%s", hdfsGetLastError());
+    DP("Writing failed.\n");
     return OFFLOAD_FAIL;
   }
 
   retval = hdfsCloseFile(fs, file);
   if (retval < 0) {
-    DP("Closing failed.\n%s", hdfsGetLastError());
+    DP("Closing failed.\n");
     return OFFLOAD_FAIL;
   }
 
@@ -196,13 +196,13 @@ int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
   } while (retval == 4096);
 
   if (retval < 0) {
-    DP("Reading failed.\n%s", hdfsGetLastError());
+    DP("Reading failed.\n");
     return OFFLOAD_FAIL;
   }
 
   retval = hdfsCloseFile(fs, file);
   if (retval < 0) {
-    DP("Closing failed.\n%s", hdfsGetLastError());
+    DP("Closing failed.\n");
     return OFFLOAD_FAIL;
   }
 
@@ -216,7 +216,7 @@ int32_t GenericProvider::data_delete(void *tgt_ptr, int32_t id) {
 
   int retval = hdfsDelete(fs, filename.c_str(), 0);
   if (retval < 0) {
-    DP("Deleting file failed.\n%s", hdfsGetLastError());
+    DP("Deleting file failed.\n");
     return OFFLOAD_FAIL;
   }
 
