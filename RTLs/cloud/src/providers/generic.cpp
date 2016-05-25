@@ -168,8 +168,6 @@ int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
   return OFFLOAD_SUCCESS;
 }
 
-#define BUFSIZE 8096
-
 int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
                                        int64_t size, int32_t id) {
   int retval;
@@ -197,14 +195,19 @@ int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
 
 
   // Retrieve data by packet
-  char *buffer = (char *)hst_ptr;
+  char* buffer = reinterpret_cast<char *>(hst_ptr);
+  int current = 0;
   do {
-    retval = hdfsRead(fs, file, buffer, BUFSIZE);
-    buffer = &buffer[BUFSIZE];
-  } while (retval == BUFSIZE);
-
-
-  //retval = hdfsRead(fs, file, hst_ptr, size);
+    retval = hdfsRead(fs, file, &buffer[current], size-current);
+    if (retval < 0) {
+      DP("Reading failed.\n");
+      return OFFLOAD_FAIL;
+    }
+    current = current + retval;
+    // FIXME: Strange fix to avoid slow reading
+    //sleep(0);
+    printf("Reading %d bytes\n", retval);
+  } while (current != size);
 
   if (retval < 0) {
     DP("Reading failed.\n");
