@@ -82,6 +82,8 @@ int32_t AmazonProvider::send_file(const char *filename,
 
 int32_t AmazonProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
                                     int32_t id) {
+  int ret;
+
   // Creating temporary file to hold data to submit
   char tmp_name[] = "/tmp/tmpfile_XXXXXX";
   int tmp_fd = mkstemp(tmp_name);
@@ -109,7 +111,11 @@ int32_t AmazonProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
 
   // Submitting data to cloud
   std::string final_filename = std::to_string(id);
-  return send_file(tmp_name, final_filename.c_str());
+  ret = send_file(tmp_name, final_filename.c_str());
+
+  remove(tmp_name);
+
+  return ret;
 }
 
 int32_t AmazonProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
@@ -143,6 +149,7 @@ int32_t AmazonProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
   }
 
   fclose(ftmp);
+  remove(tmp_name);
   return OFFLOAD_SUCCESS;
 }
 
