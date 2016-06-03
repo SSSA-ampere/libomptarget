@@ -41,9 +41,14 @@ find_library(HDFS_LIB NAMES hdfs PATHS
   NO_DEFAULT_PATH
 )
 
-if (HDFS_LIB)
+
+find_package(JNI QUIET)
+
+if (HDFS_LIB AND JNI_FOUND)
+
+
   set(HDFS_FOUND TRUE)
-  set(HDFS_LIBRARIES ${HDFS_LIB})
+  set(HDFS_LIBRARIES ${HDFS_LIB} ${JNI_LIBRARIES})
   set(HDFS_STATIC_LIB ${HDFS_LIB_PATHS}/libhdfs.a)
 
   add_library(hdfs_static STATIC IMPORTED)

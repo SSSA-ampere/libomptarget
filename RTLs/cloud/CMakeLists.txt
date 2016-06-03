@@ -13,7 +13,7 @@
 
 
 
-find_package(HDFS QUIET)
+#find_package(HDFS QUIET)
 if(NOT HDFS_FOUND)
     find_package(HDFS3 QUIET)
     set(HDFS_FOUND HDFS3_FOUND)
