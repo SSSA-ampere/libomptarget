@@ -17,6 +17,7 @@
 #include <gelf.h>
 #include <libelf.h>
 #include <list>
+#include <chrono>
 #include <map>
 #include <set>
 #include <sstream>
@@ -527,6 +528,8 @@ static int target_data_begin(DeviceTy & Device, int32_t arg_num,
   void** args_base, void **args, int64_t *arg_sizes, int32_t *arg_types,
   int32_t *arg_ids)
 {
+  auto t_start = std::chrono::high_resolution_clock::now();
+
   // process each input
   for(int32_t i=0; i<arg_num; ++i){
     int res;
@@ -573,6 +576,10 @@ static int target_data_begin(DeviceTy & Device, int32_t arg_num,
     }
   }
 
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_delay = std::chrono::duration_cast<std::chrono::seconds>(t_end-t_start).count();
+  DP("Offload to device in %lds\n", t_delay);
+
   return OFFLOAD_SUCCESS;
 }
 
@@ -617,12 +624,13 @@ EXTERN void __tgt_target_data_begin(int32_t device_id, int32_t arg_num,
   target_data_begin(Device, arg_num, args_base, args, arg_sizes, arg_types, arg_ids);
 }
 
-
 /// Internal function to undo the mapping and retrieve the data from the device
 static int target_data_end(DeviceTy & Device, int32_t arg_num,
   void** args_base, void **args, int64_t *arg_sizes, int32_t *arg_types,
   int32_t *arg_ids)
 {
+  auto t_start = std::chrono::high_resolution_clock::now();
+
   int res;
   // process each input
   for(int32_t i=0; i<arg_num; ++i){
@@ -655,6 +663,10 @@ static int target_data_end(DeviceTy & Device, int32_t arg_num,
     }
   }
 
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_delay = std::chrono::duration_cast<std::chrono::seconds>(t_end-t_start).count();
+  DP("Offload from device in %0lds\n", t_delay);
+
   return OFFLOAD_SUCCESS;
 }
 
@@ -683,7 +695,6 @@ EXTERN void __tgt_target_data_end(int32_t device_id, int32_t arg_num,
   }
 
   target_data_end(Device, arg_num, args_base, args, arg_sizes, arg_types, arg_ids);
-
 }
 
 EXTERN void __tgt_target_data_end_nowait(int32_t device_id, int32_t arg_num,
