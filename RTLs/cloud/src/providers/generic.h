@@ -29,6 +29,7 @@ protected:
   int32_t execute_command(const char *command, bool print_result);
   int32_t submit_cluster();
   int32_t submit_local();
+  int32_t submit_condor();
 
 public:
   GenericProvider(ResourceInfo &resources) {

@@ -202,6 +202,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
     mode = SparkMode::client;
   } else if (smode == "cluster") {
     mode = SparkMode::cluster;
+  } else if (smode == "condor") {
+    mode = SparkMode::condor;
   } else {
     mode = SparkMode::invalid;
   }

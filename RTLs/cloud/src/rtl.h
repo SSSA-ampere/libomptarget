@@ -28,7 +28,7 @@ struct HdfsInfo {
   uintptr_t currAddr;
 };
 
-enum SparkMode { client, cluster, invalid };
+enum SparkMode { client, cluster, condor, invalid };
 
 struct SparkInfo {
   std::string ServAddress;

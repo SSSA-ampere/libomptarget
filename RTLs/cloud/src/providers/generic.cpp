@@ -241,6 +241,8 @@ int32_t GenericProvider::submit_job() {
   int32_t res;
   if (spark.Mode == SparkMode::cluster) {
     res = submit_cluster();
+  } else if (spark.Mode == SparkMode::condor) {
+    res = submit_condor();
   } else {
     res = submit_local();
   }
@@ -298,6 +300,70 @@ int32_t GenericProvider::submit_cluster() {
                     spark.ServAddress + ":" + std::to_string(spark.ServPort) +
                     " " + spark.AdditionalArgs + " --class " + spark.Package +
                     " /home/" + spark.UserName + "/spark_job.jar " + get_job_args();
+
+  DP("Executing SSH command: %s\n", cmd.c_str());
+
+  rc = ssh_run(session, cmd.c_str());
+  if (rc != SSH_OK) {
+    return(OFFLOAD_FAIL);
+  }
+
+  ssh_disconnect(session);
+  ssh_free(session);
+
+  return rc;
+}
+
+int32_t GenericProvider::submit_condor() {
+  int32_t rc;
+
+  // init ssh session
+  ssh_session session = ssh_new();
+  if (session == NULL)
+    exit(-1);
+
+  int verbosity = SSH_LOG_NOLOG;
+  int port = 22;
+
+  ssh_options_set(session, SSH_OPTIONS_HOST, spark.ServAddress.c_str());
+  ssh_options_set(session, SSH_OPTIONS_USER, spark.UserName.c_str());
+  ssh_options_set(session, SSH_OPTIONS_LOG_VERBOSITY, &verbosity);
+  ssh_options_set(session, SSH_OPTIONS_PORT, &port);
+
+  rc = ssh_connect(session);
+  if (rc != SSH_OK) {
+    fprintf(stderr, "Error connecting to server: %s\n",
+            ssh_get_error(session));
+    return(OFFLOAD_FAIL);
+  }
+
+  // Verify the server's identity
+  if (ssh_verify_knownhost(session) < 0) {
+    ssh_disconnect(session);
+    ssh_free(session);
+    return(OFFLOAD_FAIL);
+  }
+
+  rc = ssh_userauth_publickey_auto(session, spark.UserName.c_str(), NULL);
+  if (rc == SSH_AUTH_ERROR)
+  {
+     fprintf(stderr, "Authentication failed: %s\n",
+       ssh_get_error(session));
+     return(OFFLOAD_FAIL);
+  }
+
+  std::string path =  "/home/sparkcluster/";
+
+  // Copy jar file
+  rc = ssh_copy(session, spark.JarPath.c_str(), path.c_str(), "spark_job.jar");
+  if (rc != SSH_OK) {
+    return(OFFLOAD_FAIL);
+  }
+
+  // Run Spark
+  std::string cmd = "CONDOR_REQUIREMENTS=\"Machine == \\\"n15.lsc.ic.unicamp.br\\\"\" condor_run \"/home/sparkcluster/spark-1.6.1-bin-hadoop2.6/bin/spark-submit --master spark://10.68.100.15:" + std::to_string(spark.ServPort) +
+                    " " + spark.AdditionalArgs + " --class " + spark.Package +
+                    " /home/sparkcluster/spark_job.jar " + get_job_args() + "\"";
 
   DP("Executing SSH command: %s\n", cmd.c_str());
 
