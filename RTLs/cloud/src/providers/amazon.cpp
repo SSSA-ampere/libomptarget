@@ -177,7 +177,7 @@ int32_t AmazonProvider::submit_job() {
     exit(-1);
 
   ssh_options_set(aws_session, SSH_OPTIONS_HOST, spark.ServAddress.c_str());
-  ssh_options_set(aws_session, SSH_OPTIONS_USER, "root");
+  ssh_options_set(aws_session, SSH_OPTIONS_USER, spark.UserName.c_str());
   ssh_options_set(aws_session, SSH_OPTIONS_LOG_VERBOSITY, &verbosity);
   ssh_options_set(aws_session, SSH_OPTIONS_PORT, &port);
 
@@ -195,21 +195,34 @@ int32_t AmazonProvider::submit_job() {
     return OFFLOAD_FAIL;
   }
 
-  ssh_key pkey;
+  rc = ssh_userauth_publickey_auto(aws_session, spark.UserName.c_str(), NULL);
+  if (rc == SSH_AUTH_ERROR)
+  {
+    ssh_key pkey;
 
-  ssh_pki_import_privkey_file(ainfo.KeyFile.c_str(), NULL, NULL, NULL, &pkey);
-  ssh_userauth_publickey(aws_session, "root", pkey);
+    ssh_pki_import_privkey_file(ainfo.KeyFile.c_str(), NULL, NULL, NULL, &pkey);
+    rc = ssh_userauth_publickey(aws_session, spark.UserName.c_str(), pkey);
+
+    if (rc == SSH_AUTH_ERROR)
+    {
+     fprintf(stderr, "Authentication failed: %s\n",
+       ssh_get_error(aws_session));
+     return(OFFLOAD_FAIL);
+    }
+  }
+
+
 
   // Copy jar file
-  ssh_copy(aws_session, spark.JarPath.c_str(), "/root/", "spark_job.jar");
+  ssh_copy(aws_session, spark.JarPath.c_str(), "/tmp/", "spark_job.jar");
 
   // Run Spark
   std::string cmd = "export AWS_ACCESS_KEY_ID=" + ainfo.AccessKey +
                     " && export AWS_SECRET_ACCESS_KEY=" + ainfo.SecretKey +
-                    " && ./spark/bin/spark-submit --master spark://" +
+                    " && " + spark.BinPath + "spark-submit --master spark://" +
                     spark.ServAddress + ":" + std::to_string(spark.ServPort) +
                     " " + spark.AdditionalArgs + " --class " + spark.Package +
-                    " spark_job.jar " + get_job_args();
+                    " /tmp/spark_job.jar " + get_job_args();
 
   DP("Executing SSH command: %s\n", cmd.c_str());
 

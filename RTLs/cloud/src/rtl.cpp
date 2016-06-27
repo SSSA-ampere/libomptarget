@@ -212,6 +212,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       reader.Get("Spark", "HostName", ""),
       (int)reader.GetInteger("Spark", "Port", DEFAULT_SPARK_PORT), mode,
       reader.Get("Spark", "User", DEFAULT_SPARK_USER),
+      reader.Get("Spark", "BinPath", ""),
       reader.Get("Spark", "Package", DEFAULT_SPARK_PACKAGE),
       reader.Get("Spark", "JarPath", DEFAULT_SPARK_JARPATH),
       (int)reader.GetInteger("Spark", "PollInterval",

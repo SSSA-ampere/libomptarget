@@ -290,16 +290,16 @@ int32_t GenericProvider::submit_cluster() {
   std::string path =  "/home/" + spark.UserName + "/";
 
   // Copy jar file
-  rc = ssh_copy(session, spark.JarPath.c_str(), path.c_str(), "spark_job.jar");
+  rc = ssh_copy(session, spark.JarPath.c_str(), path.c_str(), "/tmp/spark_job.jar");
   if (rc != SSH_OK) {
     return(OFFLOAD_FAIL);
   }
 
   // Run Spark
-  std::string cmd = "./spark-1.5.0-bin-hadoop2.6/bin/spark-submit --master spark://" +
+  std::string cmd = spark.BinPath + "spark-submit --master spark://" +
                     spark.ServAddress + ":" + std::to_string(spark.ServPort) +
                     " " + spark.AdditionalArgs + " --class " + spark.Package +
-                    " /home/" + spark.UserName + "/spark_job.jar " + get_job_args();
+                    " /tmp/spark_job.jar " + get_job_args();
 
   DP("Executing SSH command: %s\n", cmd.c_str());
 
@@ -361,7 +361,7 @@ int32_t GenericProvider::submit_condor() {
   }
 
   // Run Spark
-  std::string cmd = "CONDOR_REQUIREMENTS=\"Machine == \\\"n15.lsc.ic.unicamp.br\\\"\" condor_run \"/home/sparkcluster/spark-1.6.1-bin-hadoop2.6/bin/spark-submit --master spark://10.68.100.15:" + std::to_string(spark.ServPort) +
+  std::string cmd = "CONDOR_REQUIREMENTS=\"Machine == \\\"n09.lsc.ic.unicamp.br\\\"\" condor_run \"" + spark.BinPath + "spark-submit --master spark://10.68.100.09:" + std::to_string(spark.ServPort) +
                     " " + spark.AdditionalArgs + " --class " + spark.Package +
                     " /home/sparkcluster/spark_job.jar " + get_job_args() + "\"";
 

@@ -35,6 +35,7 @@ struct SparkInfo {
   int ServPort;
   SparkMode Mode;
   std::string UserName;
+  std::string BinPath;
   std::string Package;
   std::string JarPath;
   int PollInterval;
