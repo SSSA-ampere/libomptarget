@@ -53,7 +53,7 @@ abstract class CloudFileSystem(path: String, uri: String) extends Serializable {
     return data
   }
   
-  def fullpath = {
+  val fullpath = {
     uri + path
   }
 
@@ -77,6 +77,10 @@ class S3(path: String, uri: String) extends CloudFileSystem(path, uri) {
     if (key.startsWith("/"))
       key = key.substring(1)
     amazonS3Client.getObject(bucket, key).getObjectContent
+  }
+  
+  override val fullpath = {
+    "s3n://" + sys.env("AWS_ACCESS_KEY_ID") + ":" + sys.env("AWS_SECRET_ACCESS_KEY") + "@" + bucket + path
   }
 
 }
