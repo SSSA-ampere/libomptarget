@@ -31,5 +31,11 @@ class CloudInfo(fs: CloudFileSystem, addressTable: HashMap[Integer, Integer]) {
  
   // Load library containing native kernel
   sc.addFile(fs.fullpath + NativeKernels.LibraryName)
+  
+  def getExecutorNumber(): Integer = {
+    var nb = sc.getExecutorStorageStatus.length
+    if(nb > 1) nb = nb - 1 // Do not count the driver node
+    return nb
+  }
 
 }
