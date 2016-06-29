@@ -392,7 +392,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type,
                            int32_t id) {
 
-  if (id > 0) {
+  if (id >= 0) {
     // Write entry in the address table
     std::ofstream ofs(DeviceInfo.AddressTables[device_id], std::ios_base::app);
     ofs << id << ";" << size << ";" << std::endl;
