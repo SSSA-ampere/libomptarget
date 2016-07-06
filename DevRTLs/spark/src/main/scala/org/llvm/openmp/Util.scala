@@ -11,7 +11,7 @@ import java.nio.ByteBuffer
 import java.nio.IntBuffer
 
 object Util {
-
+ 
   // zip the RDDs into an RDD of Seq[Int]
   def makeZip[U](s: Seq[RDD[U]]): RDD[Seq[U]] = {
     if (s.length == 1)
@@ -32,6 +32,19 @@ object Util {
     return x
   }
   
+  def bitor(x: Any, y: Any) : Any = {
+    return x
+  }
+  
+  def bitor[T <: Product](x: T, y: T) : T = {
+    var i = 0
+    while (i < x.productArity) {
+      bitor(x.productElement(i), y.productElement(i))
+      i += 1
+    }
+    return x
+  }
+  
   def bitor(x: Array[Long], y: Array[Long]) : Array[Long] = {
     var i = 0
     while (i < x.length) {
@@ -40,6 +53,7 @@ object Util {
     }
     return x
   }
+
   
   def bitor2(x: Array[Byte], y: Array[Byte]) : Array[Byte] = {
     for(i <- 0 to x.size-1) {
