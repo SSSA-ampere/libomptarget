@@ -386,6 +386,8 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
 
 #endif
 
+  remove(tmp_name);
+
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }
 
