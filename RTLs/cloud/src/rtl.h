@@ -20,6 +20,8 @@ struct DynLibTy {
   void *Handle;
 };
 
+extern const char *__progname;	/* for job name */
+
 struct HdfsInfo {
   std::string ServAddress;
   int ServPort;

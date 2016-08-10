@@ -299,6 +299,7 @@ int32_t GenericProvider::submit_cluster() {
   std::string cmd = spark.BinPath + "spark-submit --master spark://" +
                     spark.ServAddress + ":" + std::to_string(spark.ServPort) +
                     " " + spark.AdditionalArgs + " --class " + spark.Package +
+                    " --name " + "\"" + __progname + "\"" +
                     " /tmp/spark_job.jar " + get_job_args();
 
   DP("Executing SSH command: %s\n", cmd.c_str());
@@ -363,6 +364,7 @@ int32_t GenericProvider::submit_condor() {
   // Run Spark
   std::string cmd = "CONDOR_REQUIREMENTS=\"Machine == \\\"n09.lsc.ic.unicamp.br\\\"\" condor_run \"" + spark.BinPath + "spark-submit --master spark://10.68.100.09:" + std::to_string(spark.ServPort) +
                     " " + spark.AdditionalArgs + " --class " + spark.Package +
+                    " --name " + "\"" + __progname + "\"" +
                     " /home/sparkcluster/spark_job.jar " + get_job_args() + "\"";
 
   DP("Executing SSH command: %s\n", cmd.c_str());
@@ -383,6 +385,7 @@ int32_t GenericProvider::submit_local() {
 
   // Spark job entry point
   cmd += " " + spark.AdditionalArgs;
+  cmd += " --name " + "\"" + __progname + "\"" +
   cmd += " --class " + spark.Package + " " + spark.JarPath;
 
   // Execution arguments pass to the spark kernel

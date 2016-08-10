@@ -219,7 +219,8 @@ int32_t AmazonProvider::submit_job() {
   // Run Spark
   std::string cmd = "export AWS_ACCESS_KEY_ID=" + ainfo.AccessKey +
                     " && export AWS_SECRET_ACCESS_KEY=" + ainfo.SecretKey +
-                    " && " + spark.BinPath + "spark-submit --master spark://" +
+                    " && " + spark.BinPath + "spark-submit --name " + "\"" + __progname + "\"" +
+                    " --master spark://" +
                     spark.ServAddress + ":" + std::to_string(spark.ServPort) +
                     " " + spark.AdditionalArgs + " --class " + spark.Package +
                     " /tmp/spark_job.jar " + get_job_args();
