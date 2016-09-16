@@ -223,7 +223,7 @@ int32_t AmazonProvider::submit_job() {
                     " --master spark://" +
                     spark.ServAddress + ":" + std::to_string(spark.ServPort) +
                     " " + spark.AdditionalArgs + " --class " + spark.Package +
-                    " /tmp/spark_job.jar " + get_job_args();
+                    " /tmp/spark_job.jar " + get_job_args() + " " + ainfo.AccessKey + " " + ainfo.SecretKey;
 
   DP("Executing SSH command: %s\n", cmd.c_str());
 

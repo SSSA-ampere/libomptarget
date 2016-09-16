@@ -69,7 +69,7 @@ struct ProviderListEntry {
 #define DEFAULT_SPARK_USER "anonymous"
 #define DEFAULT_SPARK_MODE "client"
 #define DEFAULT_SPARK_PACKAGE "org.llvm.openmp.OmpKernel"
-#define DEFAULT_SPARK_JARPATH "target/scala-2.10/test-assembly-0.1.0.jar"
+#define DEFAULT_SPARK_JARPATH "target/scala-2.11/test-assembly-0.2.0.jar"
 #define DEFAULT_SPARK_POLLINTERVAL 300
 #define DEFAULT_PROXY_HOSTNAME ""
 #define DEFAULT_PROXY_PORT 0

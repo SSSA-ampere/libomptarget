@@ -32,6 +32,7 @@ object Util {
     return x
   }
   
+  /*
   def bitor(x: Any, y: Any) : Any = {
     return x
   }
@@ -61,5 +62,6 @@ object Util {
     }
     return x
   }
+  */
 
 }

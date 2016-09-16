@@ -2,13 +2,15 @@ organization := "org.llvm.openmp"
 
 name := "omptarget-spark"
 
-version := "0.1.0-SNAPSHOT"
+version := "0.2.0-SNAPSHOT"
 
-scalaVersion := "2.10.6"
+scalaVersion := "2.11.8"
 
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" %   "1.10.57"
-libraryDependencies += "org.apache.spark" %% "spark-core" % "1.5.0" % "provided"
-
-dependencyOverrides ++= Set(
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.4.4"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk" %   "1.7.4"
+libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % "2.7.3" excludeAll(
+    ExclusionRule("com.amazonaws", "aws-java-sdk"),
+    ExclusionRule("commons-beanutils")
 )
+
+libraryDependencies += "org.apache.spark" %% "spark-core" % "2.0.0" % "provided"
+libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.0.0" % "provided"
