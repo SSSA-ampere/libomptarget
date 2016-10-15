@@ -27,8 +27,14 @@ object AddressTable {
 
 class CloudFileSystem(fs: FileSystem, path: String) {
   
+  val MIN_SIZE_COMPRESSION = 15*10^6 
+
   def write(name: Int, data: Array[Byte]): Unit = {
-    val filepath = new Path(path + name)
+    var extension = ""
+    if(data.length >= MIN_SIZE_COMPRESSION) {
+      //extension = ".gz"
+    }
+    val filepath = new Path(path + name + extension)
     val os = fs.create(filepath)
     os.write(data)
     os.close
