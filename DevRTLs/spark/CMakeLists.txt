@@ -7,12 +7,21 @@
 # 
 ##===----------------------------------------------------------------------===##
 #
-# Build an RTL for this machine is available
+# Build the Cloud (Spark) Device RTL if the Spark tools are available
 #
 ##===----------------------------------------------------------------------===##
 
-add_subdirectory(cuda)
-add_subdirectory(cloud)
-add_subdirectory(ppc64)
-add_subdirectory(ppc64le)
-add_subdirectory(x86_64)
+find_package(SBT)
+
+if(SBT_FOUND)
+
+    message("Building Spark device RTL")
+
+    add_custom_target(omptarget-spark ALL
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ${SBT_EXECUTABLE} publish-local)
+
+else()
+
+    message("sbt not found in system: not building Spark device RTL")
+
+endif()

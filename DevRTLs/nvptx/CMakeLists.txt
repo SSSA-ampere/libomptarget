@@ -53,7 +53,7 @@ elseif(CUDA_FOUND)
     set(BUILD_SHARED_LIBS OFF)
     set(CUDA_SEPARABLE_COMPILATION ON)
 
-    cuda_add_library(omptarget-nvptx STATIC ${cuda_src_files} 
+    cuda_add_library(omptarget-nvptx STATIC ${cuda_src_files}
         OPTIONS ${CUDA_ARCH} ${CUDA_DEBUG})
 
     target_link_libraries(omptarget-nvptx ${CUDA_LIBRARIES})
