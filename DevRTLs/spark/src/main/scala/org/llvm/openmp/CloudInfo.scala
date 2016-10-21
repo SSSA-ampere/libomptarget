@@ -78,5 +78,10 @@ class CloudInfo(args: Array[String]) {
     if(nb > 1) nb = nb - 1 // Do not count the driver node
     return nb
   }
+  
+  def getParallelism(): Integer = {
+    val parallelism = sc.getConf.getInt("spark.default.parallelism", sc.defaultParallelism)
+    return parallelism
+  }
 
 }
