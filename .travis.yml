@@ -17,7 +17,7 @@ before_install:
   - mkdir $LIBHDFS3_BUILD
   - cd $LIBHDFS3_BUILD
   - cmake $LIBHDFS3_SRC
-  - make install
+  - sudo make install
   # Install other libomptarget dependencies
   - sudo apt-get install libssh-dev libelf-dev libffi-dev python-pip sbt
 
