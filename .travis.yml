@@ -4,13 +4,14 @@ sudo: required
 dist: trusty
 
 env:
-  - LIBHDFS3_SRC="~/libhdfs3"
-  - LIBHDFS3_BUILD="~/libhdfs3-build"
+  global:
+    - LIBHDFS3_SRC="~/libhdfs3"
+    - LIBHDFS3_BUILD="~/libhdfs3-build"
 
 before_install:
-  - apt-get update -qq
+  - sudo apt-get update -qq
   # Install libhdfs3 dependencies
-  - apt-get install -y libxml2-dev uuid-dev libprotobuf-dev protobuf-compiler libgsasl7-dev libkrb5-dev libboost-all-dev
+  - sudo apt-get install -y libxml2-dev uuid-dev libprotobuf-dev protobuf-compiler libgsasl7-dev libkrb5-dev libboost-all-dev
   # Build libhdfs3
   - git clone git://github.com/Pivotal-Data-Attic/pivotalrd-libhdfs3.git $LIBHDFS3_SRC
   - mkdir LIBHDFS3_BUILD
