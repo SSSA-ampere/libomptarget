@@ -25,7 +25,7 @@ before_install:
   - sudo apt-get install libssh-dev libelf-dev libffi-dev python-pip sbt
 
 script:
-  - mkdir build
-  - cd build
-  - cmake ..
+  - mkdir $TRAVIS_BUILD_DIR/build
+  - cd $TRAVIS_BUILD_DIR/build
+  - cmake $TRAVIS_BUILD_DIR
   - make
