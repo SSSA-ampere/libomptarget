@@ -1,5 +1,7 @@
 # libomptarget - OpenMP offloading runtime libraries for Clang 
 
+[![Build Status](https://travis-ci.org/ompcloud/libomptarget.svg?branch=cloud)](https://travis-ci.org/ompcloud/libomptarget)
+
 This is a prototype implementation of the OpenMP offloading library to be 
 supported by Clang. The current implementation has been tested in Linux so far.
 
