@@ -3,6 +3,10 @@ language: cpp
 sudo: required
 dist: trusty
 
+compiler:
+  - clang
+  - gcc
+
 env:
   global:
     - LIBHDFS3_SRC="$HOME/libhdfs3"
