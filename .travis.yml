@@ -8,6 +8,14 @@ env:
   global:
   - LIBHDFS3_SRC="$HOME/libhdfs3"
   - LIBHDFS3_BUILD="$HOME/libhdfs3-build"
+cache:
+  directories:
+  - $HOME/.ivy2/cache
+  - $HOME/.sbt/boot
+before_cache:
+# Tricks to avoid unnecessary cache updates
+- find $HOME/.ivy2 -name "ivydata-*.properties" -delete
+- find $HOME/.sbt -name "*.lock" -delete
 before_install:
 - sudo apt-get update -qq
 - sudo apt-get install libxml2-dev uuid-dev libprotobuf-dev protobuf-compiler libgsasl7-dev
