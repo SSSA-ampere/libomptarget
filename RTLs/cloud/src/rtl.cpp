@@ -57,9 +57,9 @@ static RTLDeviceInfoTy DeviceInfo;
 
 RTLDeviceInfoTy::RTLDeviceInfoTy() {
 
-  const char* conf_filename = getenv("CLOUD_CONF_PATH");
+  const char* conf_filename = getenv(OMPCLOUD_CONF_ENV);
   if(conf_filename == NULL) {
-    conf_filename = DEFAULT_CLOUD_RTL_CONF_FILE;
+    conf_filename = DEFAULT_OMPCLOUD_CONF_FILE;
   }
 
   INIReader reader(conf_filename);
@@ -158,9 +158,9 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 
   DP("Initializing device %d\n", device_id);
 
-  const char* conf_filename = getenv("CLOUD_CONF_PATH");
+  const char* conf_filename = getenv(OMPCLOUD_CONF_ENV);
   if(conf_filename == NULL) {
-    conf_filename = DEFAULT_CLOUD_RTL_CONF_FILE;
+    conf_filename = DEFAULT_OMPCLOUD_CONF_FILE;
   }
 
   // Parsing configurations

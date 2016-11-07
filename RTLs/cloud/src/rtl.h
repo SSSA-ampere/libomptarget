@@ -63,7 +63,8 @@ struct ProviderListEntry {
   std::string SectionName;
 };
 
-#define DEFAULT_CLOUD_RTL_CONF_FILE "cloud_rtl.ini"
+#define OMPCLOUD_CONF_ENV "OMPCLOUD_CONF_PATH"
+#define DEFAULT_OMPCLOUD_CONF_FILE "ompcloud-conf.ini"
 #define DEFAULT_HDFS_PORT 9000
 #define DEFAULT_SPARK_PORT 7077
 #define DEFAULT_SPARK_USER "anonymous"
