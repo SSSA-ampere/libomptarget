@@ -92,7 +92,7 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
 
   // Parsing proxy configuration, if exists
   if (reader.ParseError() < 0) {
-    DP("Couldn't find '%s'!\n", DEFAULT_CLOUD_RTL_CONF_FILE);
+    DP("Couldn't find '%s'!\n", DEFAULT_OMPCLOUD_CONF_FILE);
   } else {
     ProxyInfo proxy{
         reader.Get("Proxy", "HostName", DEFAULT_PROXY_HOSTNAME),
