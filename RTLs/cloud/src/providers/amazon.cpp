@@ -46,8 +46,8 @@ int32_t AmazonProvider::parse_config(INIReader reader) {
 
   ainfo.Bucket = reader.Get("AmazonProvider", "Bucket", "");
   ainfo.Cluster = reader.Get("AmazonProvider", "Cluster", "");
-  ainfo.AccessKey = reader.Get("AmazonProvider", "AccessKey", "");
-  ainfo.SecretKey = reader.Get("AmazonProvider", "SecretKey", "");
+  ainfo.AccessKey = reader.Get("AmazonProvider", "AccessKey", std::getenv("AWS_ACCESS_KEY_ID"));
+  ainfo.SecretKey = reader.Get("AmazonProvider", "SecretKey", std::getenv("AWS_SECRET_ACCESS_KEY"));
   ainfo.KeyFile = reader.Get("AmazonProvider", "KeyFile", "");
   ainfo.AdditionalArgs = reader.Get("AmazonProvider", "AdditionalArgs", "");
 
