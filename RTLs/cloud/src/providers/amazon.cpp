@@ -225,8 +225,6 @@ int32_t AmazonProvider::submit_job() {
                     " " + spark.AdditionalArgs + " --class " + spark.Package +
                     " /tmp/spark_job.jar " + get_job_args() + " " + ainfo.AccessKey + " " + ainfo.SecretKey;
 
-  DP("Executing SSH command: %s\n", cmd.c_str());
-
   rc = ssh_run(aws_session, cmd.c_str());
 
   ssh_disconnect(aws_session);

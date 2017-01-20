@@ -160,8 +160,6 @@ int ssh_run(ssh_session session, const char* cmd) {
     return rc;
   }
 
-  fprintf(stdout, "Executing SSH command: %s\n", cmd);
-
   rc = ssh_channel_request_exec(channel, cmd);
 
   if (rc != SSH_OK) {

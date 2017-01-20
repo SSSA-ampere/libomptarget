@@ -430,8 +430,6 @@ std::string GenericProvider::get_job_args() {
 
 int32_t GenericProvider::execute_command(const char *command,
                                          bool print_result) {
-  DP("Executing command: %s\n", command);
-
   FILE *fp = popen(command, "r");
 
   if (fp == NULL) {
