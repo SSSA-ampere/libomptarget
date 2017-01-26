@@ -11,6 +11,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.fs.FileUtil
 import java.io.File
+import org.apache.hadoop.conf.Configuration
 
 object NativeKernels {
 
@@ -43,17 +44,19 @@ class CloudInfo(args: Array[String]) {
   
   val sc = session.sparkContext
   
+  var fsConf = new Configuration
+
   filesystem match {
     case "S3" =>
-      sc.hadoopConfiguration.set("fs.s3a.impl","org.apache.hadoop.fs.s3a.S3AFileSystem")
-      sc.hadoopConfiguration.set("fs.s3a.awsAccessKeyId", args(4))
-      sc.hadoopConfiguration.set("fs.s3a.awsSecretAccessKey", args(5))
+      fsConf.set("fs.s3a.impl","org.apache.hadoop.fs.s3a.S3AFileSystem")
+      fsConf.set("fs.s3a.awsAccessKeyId", args(4))
+      fsConf.set("fs.s3a.awsSecretAccessKey", args(5))
       
-      //sc.hadoopConfiguration.set("fs.s3n.impl", "org.apache.hadoop.fs.s3native.NativeS3FileSystem")
-      //sc.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", accessKey)
-      //sc.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", secretKey)
+      //fsConf.set("fs.s3n.impl", "org.apache.hadoop.fs.s3native.NativeS3FileSystem")
+      //fsConf.set("fs.s3n.awsAccessKeyId", accessKey)
+      //fsConf.set("fs.s3n.awsSecretAccessKey", secretKey)
       
-      //sc.hadoopConfiguration.set("fs.defaultFS", uri)
+      //fsConf.set("fs.defaultFS", uri)
     case "HDFS" => 
       System.setProperty("HADOOP_USER_NAME", username)
       //sc.hadoopConfiguration.set("fs.defaultFS", uri)
@@ -66,7 +69,7 @@ class CloudInfo(args: Array[String]) {
   
   val localLibrary = new File("/tmp/", NativeKernels.LibraryName)
   
-  FileUtil.copy(fs, new Path(uri + path + NativeKernels.LibraryName), localLibrary, false, sc.hadoopConfiguration)
+  FileUtil.copy(fs, new Path(uri + path + NativeKernels.LibraryName), localLibrary, false, fsConf)
 
   def init(fs: CloudFileSystem) {
     // Load library containing native kernel
