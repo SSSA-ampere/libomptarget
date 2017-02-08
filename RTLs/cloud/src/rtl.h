@@ -27,6 +27,7 @@ struct HdfsInfo {
   int ServPort;
   std::string UserName;
   std::string WorkingDir;
+  bool Compression;
   uintptr_t currAddr;
 };
 
@@ -75,6 +76,7 @@ struct ProviderListEntry {
 #define DEFAULT_PROXY_HOSTNAME ""
 #define DEFAULT_PROXY_PORT 0
 #define DEFAULT_PROXY_TYPE ""
+const int MIN_SIZE_COMPRESSION = 1*10^6;
 
 /// Keep entries table per device
 struct FuncOrGblEntryTy {

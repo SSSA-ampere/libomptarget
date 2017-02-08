@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "gzip_cpp.h"
 #include "providers/amazon.h"
 #include "providers/generic.h"
 #include "rtl.h"
@@ -57,8 +58,8 @@ static RTLDeviceInfoTy DeviceInfo;
 
 RTLDeviceInfoTy::RTLDeviceInfoTy() {
 
-  const char* conf_filename = getenv(OMPCLOUD_CONF_ENV);
-  if(conf_filename == NULL) {
+  const char *conf_filename = getenv(OMPCLOUD_CONF_ENV);
+  if (conf_filename == NULL) {
     conf_filename = DEFAULT_OMPCLOUD_CONF_FILE;
   }
 
@@ -158,8 +159,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 
   DP("Initializing device %d\n", device_id);
 
-  const char* conf_filename = getenv(OMPCLOUD_CONF_ENV);
-  if(conf_filename == NULL) {
+  const char *conf_filename = getenv(OMPCLOUD_CONF_ENV);
+  if (conf_filename == NULL) {
     conf_filename = DEFAULT_OMPCLOUD_CONF_FILE;
   }
 
@@ -176,6 +177,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       (int)reader.GetInteger("HDFS", "Port", DEFAULT_HDFS_PORT),
       reader.Get("HDFS", "User", ""),
       reader.Get("HDFS", "WorkingDir", ""),
+      reader.GetBoolean("HDFS", "Compression", true),
       1,
   };
 
@@ -413,14 +415,35 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
     return OFFLOAD_SUCCESS;
   }
 
-  return DeviceInfo.Providers[device_id]->data_submit(tgt_ptr, hst_ptr, size,
-                                                      id);
+  // Since we now need the hdfs file, we create it here
+  std::string filename = std::to_string(id);
+
+  if (DeviceInfo.HdfsClusters[device_id].Compression && size >= MIN_SIZE_COMPRESSION) {
+    gzip::Comp comp(gzip::Comp::Level::Default, true);
+    if (!comp.IsSucc()) {
+      DP("Failed to create compressor\n");
+      exit(OFFLOAD_FAIL);
+    }
+
+    gzip::DataList out_data_list =
+        comp.Process((const char *)hst_ptr, size, true);
+    gzip::Data comp_data = gzip::ExpandDataList(out_data_list);
+
+    filename += ".gz";
+
+    return DeviceInfo.Providers[device_id]->data_submit(
+        comp_data->ptr, comp_data->size, filename);
+  }
+
+  return DeviceInfo.Providers[device_id]->data_submit(hst_ptr, size, filename);
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size, int32_t id) {
-  return DeviceInfo.Providers[device_id]->data_retrieve(hst_ptr, tgt_ptr, size,
-                                                        id);
+  std::string filename = std::to_string(id);
+
+  return DeviceInfo.Providers[device_id]->data_retrieve(hst_ptr, size,
+                                                        filename);
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr, int32_t id) {

@@ -44,8 +44,8 @@ public:
   int32_t parse_config(INIReader reader);
   int32_t init_device();
   int32_t send_file(const char *filename, const char *tgtfilename);
-  int32_t data_submit(void *tgt_ptr, void *hst_ptr, int64_t size, int32_t id);
-  int32_t data_retrieve(void *hst_ptr, void *tgt_ptr, int64_t size, int32_t id);
+  virtual int32_t data_submit(void *data_ptr, int64_t size, std::string name);
+  virtual int32_t data_retrieve(void *data_ptr, int64_t size, std::string name);
   int32_t data_delete(void *tgt_ptr, int32_t id);
   int32_t submit_job();
 };

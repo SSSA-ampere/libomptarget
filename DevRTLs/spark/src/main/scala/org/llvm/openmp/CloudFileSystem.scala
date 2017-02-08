@@ -1,6 +1,7 @@
 package org.llvm.openmp
 
 import java.io.InputStream
+import java.io.OutputStream
 import java.util.HashMap
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.FileSystem
@@ -8,6 +9,9 @@ import org.apache.hadoop.fs.Path
 import org.apache.hadoop.fs.s3
 import java.net.URI
 import org.apache.hadoop.fs.s3native.NativeS3FileSystem
+import scala.util.Try
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.io.compress.CompressionCodecFactory
 
 object AddressTable {
 
@@ -25,17 +29,24 @@ object AddressTable {
   }
 }
 
-class CloudFileSystem(fs: FileSystem, path: String) {
-  
-  val MIN_SIZE_COMPRESSION = 15*10^6 
+class CloudFileSystem(fs: FileSystem, path: String, compressOption: String) {
 
-  def write(name: Int, data: Array[Byte]): Unit = {
+  val MIN_SIZE_COMPRESSION = 1 * 10 ^ 6
+  val compress = Try(compressOption.toBoolean).getOrElse(true)
+
+  val ccf = new CompressionCodecFactory(new Configuration)
+  val codec = ccf.getCodecByName("gzip");
+
+  def write(name: Integer, size: Integer, data: Array[Byte]): Unit = {
     var extension = ""
-    if(data.length >= MIN_SIZE_COMPRESSION) {
-      //extension = ".gz"
+    if (compress && size >= MIN_SIZE_COMPRESSION) {
+      extension = ".gz"
     }
     val filepath = new Path(path + name + extension)
-    val os = fs.create(filepath)
+    var os: OutputStream = fs.create(filepath)
+    if (compress && size >= MIN_SIZE_COMPRESSION) {
+      os = codec.createOutputStream(os)
+    }
     os.write(data)
     os.close
   }
@@ -46,10 +57,22 @@ class CloudFileSystem(fs: FileSystem, path: String) {
   }
 
   def read(name: Integer, size: Integer): Array[Byte] = {
-    val filepath = new Path(path + name)
-    val is = fs.open(filepath)
+    var extension = ""
+    if (compress && size >= MIN_SIZE_COMPRESSION) {
+      extension = ".gz"
+    }
+    val filepath = new Path(path + name + extension)
+
+    var is: InputStream = fs.open(filepath)
+    if (compress && size >= MIN_SIZE_COMPRESSION) {
+      is = codec.createInputStream(is)
+    }
     val data = IOUtils.toByteArray(is)
     is.close
+    if (data.size != size)
+      throw new RuntimeException("Wrong input size of " +
+        filepath.toString() + " : " + data.size + " instead of " + size)
+
     return data
   }
 

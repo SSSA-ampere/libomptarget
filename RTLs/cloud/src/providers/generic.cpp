@@ -12,20 +12,22 @@
 //===----------------------------------------------------------------------===//
 
 #include <hdfs.h>
+#include <libssh/libssh.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <thread>
-#include <libssh/libssh.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
 
 #include "../rtl.h"
+#include "../util/ssh.h"
 #include "INIReader.h"
 #include "generic.h"
 #include "omptarget.h"
-#include "../util/ssh.h"
+
+#include "gzip_cpp.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
@@ -140,10 +142,12 @@ void *GenericProvider::data_alloc(int64_t size, int32_t type, int32_t id) {
   return (void *)currAddr++;
 }
 
-int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
-                                     int32_t id) {
+int32_t GenericProvider::data_submit(void *data_ptr, int64_t size,
+                                     std::string filename) {
+
   // Since we now need the hdfs file, we create it here
-  std::string filename = hdfs.WorkingDir + std::to_string(id);
+  filename = hdfs.WorkingDir + filename;
+
   DP("Submitting data to file %s\n", filename.c_str());
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
@@ -153,7 +157,7 @@ int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
     return OFFLOAD_FAIL;
   }
 
-  int retval = hdfsWrite(fs, file, hst_ptr, size);
+  int retval = hdfsWrite(fs, file, data_ptr, size);
   if (retval < 0) {
     DP("Writing failed.\n");
     return OFFLOAD_FAIL;
@@ -168,21 +172,27 @@ int32_t GenericProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
   return OFFLOAD_SUCCESS;
 }
 
-int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
-                                       int64_t size, int32_t id) {
+int32_t GenericProvider::data_retrieve(void *data_ptr, int64_t size,
+                                       std::string filename) {
   int retval;
-  std::string filename = hdfs.WorkingDir + std::to_string(id);
+  filename = hdfs.WorkingDir + filename;
+
+  if (hdfs.Compression && size >= MIN_SIZE_COMPRESSION) {
+    filename += ".gz";
+  }
 
   DP("Reading data from file '%s'\n", filename.c_str());
 
   retval = hdfsExists(fs, filename.c_str());
-  if(retval < 0) {
+  if (retval < 0) {
     DP("File does not exist\n");
     return OFFLOAD_FAIL;
   }
 
   hdfsFileInfo *fileInfo = hdfsGetPathInfo(fs, filename.c_str());
-  if (fileInfo->mSize != size) {
+  if (hdfs.Compression && size >= MIN_SIZE_COMPRESSION) {
+    DP("File compressed to %d bytes\n", fileInfo->mSize, size);
+  } else if (fileInfo->mSize != size) {
     DP("Wrong file size: %d instead of %d\n", fileInfo->mSize, size);
     return OFFLOAD_FAIL;
   }
@@ -193,21 +203,28 @@ int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
     return OFFLOAD_FAIL;
   }
 
-
   // Retrieve data by packet
-  char* buffer = reinterpret_cast<char *>(hst_ptr);
+  char *buffer;
+
+  gzip::Data data_comp;
+  if (hdfs.Compression && size >= MIN_SIZE_COMPRESSION) {
+    data_comp = gzip::AllocateData(fileInfo->mSize);
+    buffer = data_comp->ptr;
+  } else
+    buffer = reinterpret_cast<char *>(data_ptr);
+
   int current = 0;
   do {
-    retval = hdfsRead(fs, file, &buffer[current], size-current);
+    retval = hdfsRead(fs, file, &buffer[current], size - current);
     if (retval < 0) {
       DP("Reading failed.\n");
       return OFFLOAD_FAIL;
     }
     current = current + retval;
     // FIXME: Strange fix to avoid slow reading
-    //sleep(0);
+    // sleep(0);
     printf("Reading %d bytes\n", retval);
-  } while (current != size);
+  } while (current != fileInfo->mSize);
 
   if (retval < 0) {
     DP("Reading failed.\n");
@@ -220,11 +237,33 @@ int32_t GenericProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
     return OFFLOAD_FAIL;
   }
 
+  if (hdfs.Compression && size >= MIN_SIZE_COMPRESSION) {
+    gzip::Decomp decomp;
+    if (!decomp.IsSucc())
+      return OFFLOAD_FAIL;
+
+    bool succ;
+    gzip::DataList out_data_list;
+    std::tie(succ, out_data_list) = decomp.Process(data_comp);
+    gzip::Data decomp_data = gzip::ExpandDataList(out_data_list);
+
+    if (decomp_data->size != size) {
+      DP("Decompressed data are not the right size. => %d\n",
+         decomp_data->size);
+      return OFFLOAD_FAIL;
+    }
+    memcpy(data_ptr, decomp_data->ptr, size);
+  }
+
   return OFFLOAD_SUCCESS;
 }
 
 int32_t GenericProvider::data_delete(void *tgt_ptr, int32_t id) {
   std::string filename = hdfs.WorkingDir + std::to_string(id);
+
+  if (hdfs.Compression) {
+    filename += ".gz";
+  }
 
   DP("Deleting file '%s'\n", filename.c_str());
 
@@ -267,32 +306,27 @@ int32_t GenericProvider::submit_cluster() {
 
   rc = ssh_connect(session);
   if (rc != SSH_OK) {
-    fprintf(stderr, "Error connecting to server: %s\n",
-            ssh_get_error(session));
-    return(OFFLOAD_FAIL);
+    fprintf(stderr, "Error connecting to server: %s\n", ssh_get_error(session));
+    return (OFFLOAD_FAIL);
   }
 
   // Verify the server's identity
   if (ssh_verify_knownhost(session) < 0) {
     ssh_disconnect(session);
     ssh_free(session);
-    return(OFFLOAD_FAIL);
+    return (OFFLOAD_FAIL);
   }
 
   rc = ssh_userauth_publickey_auto(session, spark.UserName.c_str(), NULL);
-  if (rc == SSH_AUTH_ERROR)
-  {
-     fprintf(stderr, "Authentication failed: %s\n",
-       ssh_get_error(session));
-     return(OFFLOAD_FAIL);
+  if (rc == SSH_AUTH_ERROR) {
+    fprintf(stderr, "Authentication failed: %s\n", ssh_get_error(session));
+    return (OFFLOAD_FAIL);
   }
 
-  std::string path =  "/home/" + spark.UserName + "/";
-
   // Copy jar file
-  rc = ssh_copy(session, spark.JarPath.c_str(), path.c_str(), "/tmp/spark_job.jar");
+  rc = ssh_copy(session, spark.JarPath.c_str(), "/tmp/", "spark_job.jar");
   if (rc != SSH_OK) {
-    return(OFFLOAD_FAIL);
+    return (OFFLOAD_FAIL);
   }
 
   // Run Spark
@@ -306,7 +340,7 @@ int32_t GenericProvider::submit_cluster() {
 
   rc = ssh_run(session, cmd.c_str());
   if (rc != SSH_OK) {
-    return(OFFLOAD_FAIL);
+    return (OFFLOAD_FAIL);
   }
 
   ssh_disconnect(session);
@@ -333,45 +367,46 @@ int32_t GenericProvider::submit_condor() {
 
   rc = ssh_connect(session);
   if (rc != SSH_OK) {
-    fprintf(stderr, "Error connecting to server: %s\n",
-            ssh_get_error(session));
-    return(OFFLOAD_FAIL);
+    fprintf(stderr, "Error connecting to server: %s\n", ssh_get_error(session));
+    return (OFFLOAD_FAIL);
   }
 
   // Verify the server's identity
   if (ssh_verify_knownhost(session) < 0) {
     ssh_disconnect(session);
     ssh_free(session);
-    return(OFFLOAD_FAIL);
+    return (OFFLOAD_FAIL);
   }
 
   rc = ssh_userauth_publickey_auto(session, spark.UserName.c_str(), NULL);
-  if (rc == SSH_AUTH_ERROR)
-  {
-     fprintf(stderr, "Authentication failed: %s\n",
-       ssh_get_error(session));
-     return(OFFLOAD_FAIL);
+  if (rc == SSH_AUTH_ERROR) {
+    fprintf(stderr, "Authentication failed: %s\n", ssh_get_error(session));
+    return (OFFLOAD_FAIL);
   }
 
-  std::string path =  "/home/sparkcluster/";
+  std::string path = "/home/sparkcluster/";
 
   // Copy jar file
   rc = ssh_copy(session, spark.JarPath.c_str(), path.c_str(), "spark_job.jar");
   if (rc != SSH_OK) {
-    return(OFFLOAD_FAIL);
+    return (OFFLOAD_FAIL);
   }
 
   // Run Spark
-  std::string cmd = "CONDOR_REQUIREMENTS=\"Machine == \\\"n09.lsc.ic.unicamp.br\\\"\" condor_run \"" + spark.BinPath + "spark-submit --master spark://10.68.100.09:" + std::to_string(spark.ServPort) +
-                    " " + spark.AdditionalArgs + " --class " + spark.Package +
-                    " --name " + std::string("\"") + __progname + std::string("\"") +
-                    " /home/sparkcluster/spark_job.jar " + get_job_args() + "\"";
+  std::string cmd =
+      "CONDOR_REQUIREMENTS=\"Machine == \\\"n09.lsc.ic.unicamp.br\\\"\" "
+      "condor_run \"" +
+      spark.BinPath + "spark-submit --master spark://10.68.100.09:" +
+      std::to_string(spark.ServPort) + " " + spark.AdditionalArgs +
+      " --class " + spark.Package + " --name " + std::string("\"") +
+      __progname + std::string("\"") + " /home/sparkcluster/spark_job.jar " +
+      get_job_args() + "\"";
 
   DP("Executing SSH command: %s\n", cmd.c_str());
 
   rc = ssh_run(session, cmd.c_str());
   if (rc != SSH_OK) {
-    return(OFFLOAD_FAIL);
+    return (OFFLOAD_FAIL);
   }
 
   ssh_disconnect(session);
@@ -386,7 +421,7 @@ int32_t GenericProvider::submit_local() {
   // Spark job entry point
   cmd += " " + spark.AdditionalArgs;
   cmd += " --name " + std::string("\"") + __progname + std::string("\"") +
-  cmd += " --class " + spark.Package + " " + spark.JarPath;
+         cmd += " --class " + spark.Package + " " + spark.JarPath;
 
   // Execution arguments pass to the spark kernel
   cmd += " " + get_job_args();
@@ -424,6 +459,11 @@ std::string GenericProvider::get_job_args() {
 
   args += " " + hdfs.UserName;
   args += " " + hdfs.WorkingDir;
+
+  if (hdfs.Compression)
+    args += " true";
+  else
+    args += " false";
 
   return args;
 }
