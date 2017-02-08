@@ -1,10 +1,6 @@
 language: cpp
 sudo: required
 dist: trusty
-# Use https (public access) instead of git for git-submodules. This modifies only Travis-CI behavior!
-# disable the default submodule logic
-git:
-  submodules: false
 compiler:
 - clang
 - gcc
@@ -21,9 +17,6 @@ before_cache:
 - find $HOME/.ivy2 -name "ivydata-*.properties" -delete
 - find $HOME/.sbt -name "*.lock" -delete
 before_install:
-# use sed to replace the SSH URL with the public URL, then init and update submodules
-- sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
-- git submodule update --init --recursive
 - sudo apt-get update -qq
 - sudo apt-get install libxml2-dev uuid-dev libprotobuf-dev protobuf-compiler libgsasl7-dev
   libkrb5-dev libboost-all-dev
