@@ -16,12 +16,14 @@ cache:
   directories:
   - $HOME/.ivy2/cache
   - $HOME/.sbt/boot
-before_install:
 before_cache:
 # Tricks to avoid unnecessary cache updates
 - find $HOME/.ivy2 -name "ivydata-*.properties" -delete
 - find $HOME/.sbt -name "*.lock" -delete
 before_install:
+# use sed to replace the SSH URL with the public URL, then init and update submodules
+- sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+- git submodule update --init --recursive
 - sudo apt-get update -qq
 - sudo apt-get install libxml2-dev uuid-dev libprotobuf-dev protobuf-compiler libgsasl7-dev
   libkrb5-dev libboost-all-dev
@@ -34,9 +36,6 @@ before_install:
 - sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 642AC823
 - sudo apt-get update
 - sudo apt-get install libssh-dev libelf-dev libffi-dev python-pip sbt
-# use sed to replace the SSH URL with the public URL, then init and update submodules
-- sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
-- git submodule update --init --recursive
 script:
 - mkdir $TRAVIS_BUILD_DIR/build
 - cd $TRAVIS_BUILD_DIR/build
