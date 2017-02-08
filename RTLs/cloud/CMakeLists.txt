@@ -27,14 +27,20 @@ if((HDFS_FOUND) AND LIBSSH_FOUND)
 
     message("Building cloud target RTL")
 
+    find_package(ZLIB REQUIRED)
+
     include_directories(
         inih  util
+        gzip_cpp/include
+        ${ZLIB_INCLUDE_DIRS}
         ${HDFS_INCLUDE_DIR}
         ${LIBELF_INCLUDE_DIRS}
         ${LIBSSH_INCLUDE_DIRS}
     )
 
     add_library(inih SHARED inih/ini.c inih/INIReader.cpp)
+
+    add_library(gzip_cpp SHARED gzip_cpp/src/gzip_cpp.cc gzip_cpp/include/gzip_cpp.h)
 
     add_library(
         omptarget.rtl.cloud SHARED
@@ -47,9 +53,11 @@ if((HDFS_FOUND) AND LIBSSH_FOUND)
 
     target_link_libraries(omptarget.rtl.cloud
       inih
+      gzip_cpp
       ${HDFS_LIBRARIES}
       ${LIBELF_LIBRARIES}
       ${LIBSSH_LIBRARIES}
+      ${ZLIB_LIBRARIES}
     )
 
 else()
