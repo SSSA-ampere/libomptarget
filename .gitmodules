@@ -1,0 +1,3 @@
+[submodule "RTLs/cloud/gzip_cpp"]
+	path = RTLs/cloud/gzip_cpp
+	url = git@github.com:ompcloud/gzip_cpp.git
