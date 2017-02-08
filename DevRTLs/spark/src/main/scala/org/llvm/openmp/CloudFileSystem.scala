@@ -3,14 +3,13 @@ package org.llvm.openmp
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.HashMap
+
+import scala.util.Try
+
 import org.apache.commons.io.IOUtils
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.fs.s3
-import java.net.URI
-import org.apache.hadoop.fs.s3native.NativeS3FileSystem
-import scala.util.Try
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.io.compress.CompressionCodecFactory
 
 object AddressTable {
