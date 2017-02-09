@@ -29,6 +29,8 @@ struct AmazonInfo {
   std::string AdditionalArgs;
 };
 
+const std::string DEFAULT_AWS_BUCKET = "ompcloud-bucket";
+
 GenericProvider *createAmazonProvider(ResourceInfo &resources);
 
 class AmazonProvider : public GenericProvider {

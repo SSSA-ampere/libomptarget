@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cstdlib>
 #include <hdfs.h>
 #include <libssh/libssh.h>
 #include <stdio.h>
@@ -45,13 +46,34 @@ GenericProvider *createAmazonProvider(ResourceInfo &resources) {
 }
 
 int32_t AmazonProvider::parse_config(INIReader reader) {
+  ainfo.Bucket = reader.Get("AmazonProvider", "Bucket", DEFAULT_AWS_BUCKET);
+  if (ainfo.AccessKey.empty())
+    DP("Did not find S3 bucket name, use default.\n");
 
-  ainfo.Bucket = reader.Get("AmazonProvider", "Bucket", "");
+  if (char *envAccessKey = std::getenv("AWS_ACCESS_KEY_ID")) {
+    ainfo.AccessKey = std::string(envAccessKey);
+  }
+  if (ainfo.AccessKey.empty()) {
+    ainfo.AccessKey = reader.Get("AmazonProvider", "AccessKey", "");
+    if (ainfo.AccessKey.empty()) {
+      DP("Did not find AWS Access Key.\n");
+      exit(OFFLOAD_FAIL);
+    }
+  }
+
+  if (char *envSecretKey = std::getenv("AWS_SECRET_ACCESS_KEY")) {
+    ainfo.SecretKey = std::string(envSecretKey);
+  }
+  if (ainfo.SecretKey.empty()) {
+    ainfo.SecretKey = reader.Get("AmazonProvider", "SecretKey", "");
+    if (ainfo.SecretKey.empty()) {
+      DP("Did not find AWS Secret Key.\n");
+      exit(OFFLOAD_FAIL);
+    }
+  }
+
+  // FIXME: not used anymore ?
   ainfo.Cluster = reader.Get("AmazonProvider", "Cluster", "");
-  ainfo.AccessKey = reader.Get("AmazonProvider", "AccessKey",
-                               std::getenv("AWS_ACCESS_KEY_ID"));
-  ainfo.SecretKey = reader.Get("AmazonProvider", "SecretKey",
-                               std::getenv("AWS_SECRET_ACCESS_KEY"));
   ainfo.KeyFile = reader.Get("AmazonProvider", "KeyFile", "");
   ainfo.AdditionalArgs = reader.Get("AmazonProvider", "AdditionalArgs", "");
 
