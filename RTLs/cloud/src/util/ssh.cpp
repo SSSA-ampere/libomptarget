@@ -85,7 +85,7 @@ int ssh_copy(ssh_session session, const char* filename, const char* destpath, co
   fstat(fd, &sjar);
   int size = sjar.st_size;
 
-  fprintf(stdout, "Size => %d.\n", size);
+  //fprintf(stdout, "Size => %d.\n", size);
 
   void *fbuffer = malloc(size * sizeof(char));
 

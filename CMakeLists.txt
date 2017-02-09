@@ -54,8 +54,10 @@ set(src_files
 
 include_directories(src/)
 
+set(BUILD_SHARED_LIBS true)
+
 # Build omptarget library
-add_library(omptarget SHARED ${src_files})
+add_library(omptarget ${src_files})
 target_link_libraries(omptarget ${LIBELF_LIBRARIES} dl)
 
 # Build RTL libraries when available

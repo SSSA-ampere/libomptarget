@@ -27,7 +27,7 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin" AND CMAKE_SYSTEM_PROCESSOR MATCHES ${t
 
         add_definitions(-DTARGET_NAME=${tmachine_name})
 
-        add_library(omptarget.rtl.${tmachine_libname} SHARED ../generic-64bit/src/rtl.cpp)
+        add_library(omptarget.rtl.${tmachine_libname} ../generic-64bit/src/rtl.cpp)
         target_link_libraries(omptarget.rtl.${tmachine_libname}
             ${LIBFFI_LIBRARIES} ${LIBELF_LIBRARIES}
         )

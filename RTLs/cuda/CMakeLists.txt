@@ -21,7 +21,7 @@ if(CUDA_FOUND)
         add_definitions(-DCUDA_ERROR_REPORT)
     endif()
 
-    add_library(omptarget.rtl.cuda SHARED src/rtl.cpp)
+    add_library(omptarget.rtl.cuda src/rtl.cpp)
     target_link_libraries(omptarget.rtl.cuda ${CUDA_LIBRARIES} cuda ${LIBELF_LIBRARIES})
 
 else()
