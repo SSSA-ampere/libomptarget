@@ -43,13 +43,13 @@ public:
   std::string get_keys();
   std::string get_cloud_path(std::string filename);
 
-  int32_t parse_config(INIReader reader);
-  int32_t init_device();
-  int32_t send_file(const char *filename, const char *tgtfilename);
+  virtual int32_t parse_config(INIReader reader);
+  virtual int32_t init_device();
+  virtual int32_t send_file(const char *filename, const char *tgtfilename);
   virtual int32_t data_submit(void *data_ptr, int64_t size, std::string name);
   virtual int32_t data_retrieve(void *data_ptr, int64_t size, std::string name);
-  int32_t data_delete(void *tgt_ptr, int32_t id);
-  int32_t submit_job();
+  virtual int32_t data_delete(void *tgt_ptr, int32_t id);
+  virtual int32_t submit_job();
 };
 
 #endif
