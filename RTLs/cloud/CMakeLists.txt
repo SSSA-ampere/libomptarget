@@ -29,6 +29,7 @@ if((HDFS_FOUND) AND LIBSSH_FOUND)
 
     include_directories(
         inih  util
+        gzip_cpp/include
         ${HDFS_INCLUDE_DIR}
         ${LIBELF_INCLUDE_DIRS}
         ${LIBSSH_INCLUDE_DIRS}
