@@ -100,6 +100,7 @@ int32_t AmazonProvider::send_file(const char *filename,
   command += " " + get_keys();
 
   if (execute_command(command.c_str(), true)) {
+    DP("s3cmd failed: %s\n", command.c_str());
     return OFFLOAD_FAIL;
   }
 
@@ -159,6 +160,7 @@ int32_t AmazonProvider::data_retrieve(void *data_ptr, int64_t size,
   command += " " + std::string(tmp_name) + " " + get_keys();
 
   if (execute_command(command.c_str(), true)) {
+    DP("s3cmd failed: %s\n", command.c_str());
     return OFFLOAD_FAIL;
   }
 
