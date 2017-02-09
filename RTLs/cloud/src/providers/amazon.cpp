@@ -210,7 +210,6 @@ int32_t AmazonProvider::data_retrieve(void *data_ptr, int64_t size,
       fclose(ftmp);
       return OFFLOAD_FAIL;
     }
-
   }
 
   fclose(ftmp);
@@ -299,4 +298,20 @@ int32_t AmazonProvider::submit_job() {
   ssh_free(aws_session);
 
   return rc;
+}
+
+std::string AmazonProvider::get_job_args() {
+  std::string args = "";
+
+  args += "S3";
+  args += " s3a://" + ainfo.Bucket;
+  args += " " + hdfs.UserName;
+  args += " " + hdfs.WorkingDir;
+
+  if (hdfs.Compression)
+    args += " true";
+  else
+    args += " false";
+
+  return args;
 }
