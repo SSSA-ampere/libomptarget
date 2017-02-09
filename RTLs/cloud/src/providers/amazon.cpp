@@ -144,7 +144,11 @@ int32_t AmazonProvider::data_submit(void *data_ptr, int64_t size,
 
 int32_t AmazonProvider::data_retrieve(void *data_ptr, int64_t size,
                                       std::string filename) {
-  DP("File %s, size %d.\n", filename, size);
+  if (hdfs.Compression && size >= MIN_SIZE_COMPRESSION) {
+    filename += ".gz";
+  }
+
+  DP("File %s, size %d.\n", filename.c_str(), size);
   // Creating temporary file to hold data retrieved
   const char *tmp_name = "/tmp/tmpfile_da";
 
@@ -188,11 +192,12 @@ int32_t AmazonProvider::data_retrieve(void *data_ptr, int64_t size,
 
     bool succ;
     gzip::DataList out_data_list;
-     std::tie(succ, out_data_list)   = decomp.Process(data);
+    std::tie(succ, out_data_list) = decomp.Process(data);
     gzip::Data decomp_data = gzip::ExpandDataList(out_data_list);
 
-    if(decomp_data->size != size) {
-      DP("Decompressed data are not the right size. => %d\n", decomp_data->size);
+    if (decomp_data->size != size) {
+      DP("Decompressed data are not the right size. => %d\n",
+         decomp_data->size);
       fclose(ftmp);
       remove(tmp_name);
       return OFFLOAD_FAIL;
