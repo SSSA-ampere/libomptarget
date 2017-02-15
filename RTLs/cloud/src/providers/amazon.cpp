@@ -131,6 +131,7 @@ int32_t AmazonProvider::data_submit(void *data_ptr, int64_t size,
   if (fwrite(data_ptr, 1, size, ftmp) != size) {
     DP("Could not successfully write to temporary file.\n");
     fclose(ftmp);
+    remove(tmp_name);
     return OFFLOAD_FAIL;
   }
 
@@ -161,6 +162,7 @@ int32_t AmazonProvider::data_retrieve(void *data_ptr, int64_t size,
 
   if (execute_command(command.c_str(), true)) {
     DP("s3cmd failed: %s\n", command.c_str());
+    remove(tmp_name);
     return OFFLOAD_FAIL;
   }
 
@@ -210,6 +212,7 @@ int32_t AmazonProvider::data_retrieve(void *data_ptr, int64_t size,
     if (fread(data_ptr, 1, size, ftmp) != size) {
       DP("Could not successfully read temporary file. => %d\n", size);
       fclose(ftmp);
+      remove(tmp_name);
       return OFFLOAD_FAIL;
     }
   }
