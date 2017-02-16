@@ -461,6 +461,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
                                          int32_t thread_limit) {
   const char *fileName = DeviceInfo.AddressTables[device_id].c_str();
   DeviceInfo.Providers[device_id]->send_file(fileName, "addressTable");
+  remove(fileName);
 
   return DeviceInfo.Providers[device_id]->submit_job();
 }
