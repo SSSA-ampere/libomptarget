@@ -31,13 +31,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 #include <sys/stat.h>
 
-#include "gzip_cpp.h"
 #include "providers/amazon.h"
 #include "providers/generic.h"
 #include "rtl.h"
+
+#include "util/compression.h"
 
 #include "INIReader.h"
 #include "omptarget.h"
@@ -425,27 +425,19 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   // Since we now need the hdfs file, we create it here
   std::string filename = std::to_string(id);
   std::string host_filepath = "/tmp/" + filename;
-  std::ofstream tmpfile(host_filepath);
-  if (!tmpfile.is_open()) {
-    DP("Failed to open temporary file\n");
-    exit(OFFLOAD_FAIL);
-  }
 
   if (needCompression) {
-    gzip::Comp comp(gzip::Comp::Level::Default, true);
-    if (!comp.IsSucc()) {
-      DP("Failed to create compressor\n");
-      exit(OFFLOAD_FAIL);
-    }
-
-    for (gzip::Data data : comp.Process((const char *)hst_ptr, size, true))
-      tmpfile.write(data->ptr, data->size);
+    compress_to_file(host_filepath, (char *)hst_ptr, size);
 
   } else {
+    std::ofstream tmpfile(host_filepath);
+    if (!tmpfile.is_open()) {
+      DP("Failed to open temporary file\n");
+      exit(OFFLOAD_FAIL);
+    }
     tmpfile.write((const char *)hst_ptr, size);
+    tmpfile.close();
   }
-
-  tmpfile.close();
 
   int ret_val = DeviceInfo.Providers[device_id]->send_file(
       host_filepath.c_str(), filename.c_str());
@@ -457,56 +449,30 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size, int32_t id) {
-  bool needCompression = DeviceInfo.HdfsClusters[device_id].Compression &&
-                         size >= MIN_SIZE_COMPRESSION;
+  bool needDecompression = DeviceInfo.HdfsClusters[device_id].Compression &&
+                           size >= MIN_SIZE_COMPRESSION;
 
   std::string filename = std::to_string(id);
   std::string host_filepath = "/tmp/" + filename;
 
   DeviceInfo.Providers[device_id]->get_file(host_filepath, filename);
 
-  // Reading contents of temporary file
-  FILE *ftmp = fopen(host_filepath.c_str(), "rb");
-
-  if (!ftmp) {
-    DP("Could not open temporary file.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  if (needCompression) {
-    struct stat stat_buf;
-    int rc = stat(host_filepath.c_str(), &stat_buf);
-    if (rc != 0)
-      return OFFLOAD_FAIL;
-
-    size_t comp_size = stat_buf.st_size;
-    gzip::Data data = gzip::AllocateData(comp_size);
-
-    if (fread(data->ptr, 1, data->size, ftmp) != comp_size) {
-      DP("Could not successfully read temporary file. => %d\n", comp_size);
-      fclose(ftmp);
-      remove(host_filepath.c_str());
+  if (needDecompression) {
+    // Decompress data directly to the host memory
+    int decomp_size = decompress_file(host_filepath, (char *)hst_ptr);
+    if (decomp_size != size) {
+      DP("Decompressed data are not the right size. => %d\n", decomp_size);
       return OFFLOAD_FAIL;
     }
-
-    gzip::Decomp decomp;
-    if (!decomp.IsSucc())
-      return OFFLOAD_FAIL;
-
-    bool succ;
-    gzip::DataList out_data_list;
-    std::tie(succ, out_data_list) = decomp.Process(data);
-    gzip::Data decomp_data = gzip::ExpandDataList(out_data_list);
-
-    if (decomp_data->size != size) {
-      DP("Decompressed data are not the right size. => %d\n",
-         decomp_data->size);
-      fclose(ftmp);
-      remove(host_filepath.c_str());
-      return OFFLOAD_FAIL;
-    }
-    memcpy(hst_ptr, decomp_data->ptr, size);
   } else {
+
+    // Reading contents of temporary file
+    FILE *ftmp = fopen(host_filepath.c_str(), "rb");
+
+    if (!ftmp) {
+      DP("Could not open temporary file.\n");
+      return OFFLOAD_FAIL;
+    }
 
     if (fread(hst_ptr, 1, size, ftmp) != size) {
       DP("Could not successfully read temporary file. => %d\n", size);
@@ -514,9 +480,10 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
       remove(host_filepath.c_str());
       return OFFLOAD_FAIL;
     }
+
+    fclose(ftmp);
   }
 
-  fclose(ftmp);
   remove(host_filepath.c_str());
 
   return OFFLOAD_SUCCESS;
