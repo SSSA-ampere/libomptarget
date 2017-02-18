@@ -185,13 +185,8 @@ int32_t AmazonProvider::data_retrieve(void *data_ptr, int64_t size,
   return OFFLOAD_SUCCESS;
 }
 
-int32_t AmazonProvider::data_delete(void *tgt_ptr, int32_t id) {
+int32_t AmazonProvider::delete_file(std::string filename) {
   std::string command = "s3cmd rm ";
-
-  std::string filename = std::to_string(id);
-  if (hdfs.Compression) {
-    filename += ".gz";
-  }
 
   command += get_cloud_path(filename) + " " + get_keys();
 

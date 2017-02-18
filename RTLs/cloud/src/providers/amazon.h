@@ -47,7 +47,7 @@ public:
   virtual int32_t init_device();
   virtual int32_t send_file(const char *filename, const char *tgtfilename);
   virtual int32_t data_retrieve(void *data_ptr, int64_t size, std::string name);
-  virtual int32_t data_delete(void *tgt_ptr, int32_t id);
+  virtual int32_t delete_file(std::string filename);
   virtual int32_t submit_job();
   virtual std::string get_job_args();
 };

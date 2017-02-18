@@ -228,13 +228,7 @@ int32_t GenericProvider::data_retrieve(void *data_ptr, int64_t size,
   return OFFLOAD_SUCCESS;
 }
 
-int32_t GenericProvider::data_delete(void *tgt_ptr, int32_t id) {
-  std::string filename = hdfs.WorkingDir + std::to_string(id);
-
-  if (hdfs.Compression) {
-    filename += ".gz";
-  }
-
+int32_t GenericProvider::delete_file(std::string filename) {
   DP("Deleting file '%s'\n", filename.c_str());
 
   int retval = hdfsDelete(fs, filename.c_str(), 0);

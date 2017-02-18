@@ -468,7 +468,8 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr, int32_t id) {
     return OFFLOAD_SUCCESS;
   }
 
-  return DeviceInfo.Providers[device_id]->data_delete(tgt_ptr, id);
+  std::string filename = std::to_string(id);
+  return DeviceInfo.Providers[device_id]->delete_file(filename);
 }
 
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
