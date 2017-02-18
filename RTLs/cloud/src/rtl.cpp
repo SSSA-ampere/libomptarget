@@ -31,6 +31,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+#include <sys/stat.h>
+
 #include "gzip_cpp.h"
 #include "providers/amazon.h"
 #include "providers/generic.h"
@@ -454,10 +457,69 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size, int32_t id) {
-  std::string filename = std::to_string(id);
+  bool needCompression = DeviceInfo.HdfsClusters[device_id].Compression &&
+                         size >= MIN_SIZE_COMPRESSION;
 
-  return DeviceInfo.Providers[device_id]->data_retrieve(hst_ptr, size,
-                                                        filename);
+  std::string filename = std::to_string(id);
+  std::string host_filepath = "/tmp/" + filename;
+
+  DeviceInfo.Providers[device_id]->get_file(host_filepath, filename);
+
+  // Reading contents of temporary file
+  FILE *ftmp = fopen(host_filepath.c_str(), "rb");
+
+  if (!ftmp) {
+    DP("Could not open temporary file.\n");
+    return OFFLOAD_FAIL;
+  }
+
+  if (needCompression) {
+    struct stat stat_buf;
+    int rc = stat(host_filepath.c_str(), &stat_buf);
+    if (rc != 0)
+      return OFFLOAD_FAIL;
+
+    size_t comp_size = stat_buf.st_size;
+    gzip::Data data = gzip::AllocateData(comp_size);
+
+    if (fread(data->ptr, 1, data->size, ftmp) != comp_size) {
+      DP("Could not successfully read temporary file. => %d\n", comp_size);
+      fclose(ftmp);
+      remove(host_filepath.c_str());
+      return OFFLOAD_FAIL;
+    }
+
+    gzip::Decomp decomp;
+    if (!decomp.IsSucc())
+      return OFFLOAD_FAIL;
+
+    bool succ;
+    gzip::DataList out_data_list;
+    std::tie(succ, out_data_list) = decomp.Process(data);
+    gzip::Data decomp_data = gzip::ExpandDataList(out_data_list);
+
+    if (decomp_data->size != size) {
+      DP("Decompressed data are not the right size. => %d\n",
+         decomp_data->size);
+      fclose(ftmp);
+      remove(host_filepath.c_str());
+      return OFFLOAD_FAIL;
+    }
+    memcpy(hst_ptr, decomp_data->ptr, size);
+  } else {
+
+    if (fread(hst_ptr, 1, size, ftmp) != size) {
+      DP("Could not successfully read temporary file. => %d\n", size);
+      fclose(ftmp);
+      remove(host_filepath.c_str());
+      return OFFLOAD_FAIL;
+    }
+  }
+
+  fclose(ftmp);
+  remove(host_filepath.c_str());
+
+  return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr, int32_t id) {

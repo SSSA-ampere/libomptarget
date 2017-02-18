@@ -81,7 +81,7 @@ int32_t GenericProvider::send_file(const char *filename,
 
   DP("submitting file %s as %s\n", filename, final_name.c_str());
 
-  hdfsFile file = hdfsOpenFile(fs, final_name.c_str(), O_WRONLY, 0, 0, 0);
+  hdfsFile file = hdfsOpenFile(fs, final_name.c_str(), O_WRONLY, BUFF_SIZE, 0, 0);
 
   if (file == NULL) {
     DP("Opening file in HDFS failed.\n");
@@ -142,26 +142,24 @@ void *GenericProvider::data_alloc(int64_t size, int32_t type, int32_t id) {
   return (void *)currAddr++;
 }
 
-int32_t GenericProvider::data_retrieve(void *data_ptr, int64_t size,
-                                       std::string filename) {
-  int retval;
+int32_t GenericProvider::get_file(std::string host_filename,
+                                      std::string filename) {
   filename = hdfs.WorkingDir + filename;
 
-  DP("Reading data from file '%s'\n", filename.c_str());
+  std::ofstream hostfile(host_filename);
+  if (!hostfile.is_open()) {
+    DP("Failed to open temporary file\n");
+    exit(OFFLOAD_FAIL);
+  }
 
-  retval = hdfsExists(fs, filename.c_str());
+  int retval = hdfsExists(fs, filename.c_str());
   if (retval < 0) {
     DP("File does not exist\n");
     return OFFLOAD_FAIL;
   }
 
   hdfsFileInfo *fileInfo = hdfsGetPathInfo(fs, filename.c_str());
-  if (hdfs.Compression && size >= MIN_SIZE_COMPRESSION) {
-    DP("File compressed to %d bytes\n", fileInfo->mSize, size);
-  } else if (fileInfo->mSize != size) {
-    DP("Wrong file size: %d instead of %d\n", fileInfo->mSize, size);
-    return OFFLOAD_FAIL;
-  }
+  int size = fileInfo->mSize;
 
   hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_RDONLY, 0, 0, 0);
   if (file == NULL) {
@@ -170,32 +168,22 @@ int32_t GenericProvider::data_retrieve(void *data_ptr, int64_t size,
   }
 
   // Retrieve data by packet
-  char *buffer;
+  const char *buffer = new char[BUFF_SIZE];
+  int current_pos = 0;
 
-  gzip::Data data_comp;
-  if (hdfs.Compression && size >= MIN_SIZE_COMPRESSION) {
-    data_comp = gzip::AllocateData(fileInfo->mSize);
-    buffer = data_comp->ptr;
-  } else
-    buffer = reinterpret_cast<char *>(data_ptr);
-
-  int current = 0;
   do {
-    retval = hdfsRead(fs, file, &buffer[current], size - current);
+    retval = hdfsRead(fs, file, (void *) buffer, BUFF_SIZE);
     if (retval < 0) {
       DP("Reading failed.\n");
       return OFFLOAD_FAIL;
     }
-    current = current + retval;
+    current_pos += retval;
     // FIXME: Strange fix to avoid slow reading
     // sleep(0);
     printf("Reading %d bytes\n", retval);
-  } while (current != fileInfo->mSize);
 
-  if (retval < 0) {
-    DP("Reading failed.\n");
-    return OFFLOAD_FAIL;
-  }
+    hostfile.write(buffer, BUFF_SIZE);
+  } while (current_pos != size);
 
   retval = hdfsCloseFile(fs, file);
   if (retval < 0) {
@@ -203,23 +191,7 @@ int32_t GenericProvider::data_retrieve(void *data_ptr, int64_t size,
     return OFFLOAD_FAIL;
   }
 
-  if (hdfs.Compression && size >= MIN_SIZE_COMPRESSION) {
-    gzip::Decomp decomp;
-    if (!decomp.IsSucc())
-      return OFFLOAD_FAIL;
-
-    bool succ;
-    gzip::DataList out_data_list;
-    std::tie(succ, out_data_list) = decomp.Process(data_comp);
-    gzip::Data decomp_data = gzip::ExpandDataList(out_data_list);
-
-    if (decomp_data->size != size) {
-      DP("Decompressed data are not the right size. => %d\n",
-         decomp_data->size);
-      return OFFLOAD_FAIL;
-    }
-    memcpy(data_ptr, decomp_data->ptr, size);
-  }
+  hostfile.close();
 
   return OFFLOAD_SUCCESS;
 }
