@@ -147,10 +147,6 @@ int32_t GenericProvider::data_retrieve(void *data_ptr, int64_t size,
   int retval;
   filename = hdfs.WorkingDir + filename;
 
-  if (hdfs.Compression && size >= MIN_SIZE_COMPRESSION) {
-    filename += ".gz";
-  }
-
   DP("Reading data from file '%s'\n", filename.c_str());
 
   retval = hdfsExists(fs, filename.c_str());
@@ -425,7 +421,7 @@ std::string GenericProvider::get_job_args() {
   args += " " + hdfs.WorkingDir;
 
   if (hdfs.Compression)
-    args += " true";
+    args += " " + hdfs.CompressionFormat;
   else
     args += " false";
 

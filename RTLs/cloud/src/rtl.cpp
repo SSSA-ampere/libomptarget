@@ -178,6 +178,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       reader.Get("HDFS", "User", ""),
       reader.Get("HDFS", "WorkingDir", ""),
       reader.GetBoolean("HDFS", "Compression", true),
+      reader.Get("HDFS", "CompressionFormat", DEFAULT_COMPRESSION_FORMAT),
       1,
   };
 
@@ -420,9 +421,6 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
   // Since we now need the hdfs file, we create it here
   std::string filename = std::to_string(id);
-  if (needCompression)
-    filename += ".gz";
-
   std::string host_filepath = "/tmp/" + filename;
   std::ofstream tmpfile(host_filepath);
   if (!tmpfile.is_open()) {

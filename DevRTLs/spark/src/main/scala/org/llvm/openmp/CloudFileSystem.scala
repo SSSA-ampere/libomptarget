@@ -11,6 +11,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.compress.CompressionCodecFactory
+import org.apache.hadoop.io.compress.CompressionCodec
 
 object AddressTable {
 
@@ -31,33 +32,27 @@ object AddressTable {
 class CloudFileSystem(fs: FileSystem, path: String, compressOption: String) {
 
   val MIN_SIZE_COMPRESSION = 1 * 10 ^ 6
-  var compressionCodec = "gzip"
-  var fileExtension = ".gz"
-  var compress = true
-  
-  compressOption.toLowerCase() match {
-    case "gzip" =>
-      compressionCodec = "gzip"
-      fileExtension = ".gz"
-    case "lz4" =>
-      compressionCodec = "lz4"
-      fileExtension = ".lz4"
-    case "none" =>
-      compress = false
-    case "false" =>
-      compress = false
-    case "true" =>
-      // keep default setting
-    case _ => throw new RuntimeException(compressOption + " is not a supported compression format.")
-  }
 
   val ccf = new CompressionCodecFactory(new Configuration)
-  val codec = ccf.getCodecByName(compressionCodec)
+  
+  var compress = false
+  var codec : CompressionCodec = null
+  
+  compressOption match {
+    case "gzip" =>
+      compress = true
+      codec = ccf.getCodecByName(compressOption)
+    case "lz4" =>
+      compress = true
+      codec = ccf.getCodecByName(compressOption)
+    case _ =>
+      compress = false
+  } 
 
   def write(name: Integer, size: Integer, data: Array[Byte]): Unit = {
     val compressIt = compress && size >= MIN_SIZE_COMPRESSION
-    val filepath = path + name + (if (compressIt) fileExtension else "")
-    var os: OutputStream = fs.create(new Path(filepath))
+    val filepath = new Path(path + name)
+    var os: OutputStream = fs.create(filepath)
     if (compressIt)
       os = codec.createOutputStream(os)
     os.write(data)
@@ -71,8 +66,8 @@ class CloudFileSystem(fs: FileSystem, path: String, compressOption: String) {
 
   def read(name: Integer, size: Integer): Array[Byte] = {
     val compressIt = compress && size >= MIN_SIZE_COMPRESSION
-    val filepath = path + name + (if (compressIt) fileExtension else "")
-    var is: InputStream = fs.open(new Path(filepath))
+    val filepath = new Path(path + name)
+    var is: InputStream = fs.open(filepath)
     if (compressIt)
       is = codec.createInputStream(is)
     val data = IOUtils.toByteArray(is)

@@ -28,6 +28,7 @@ struct HdfsInfo {
   std::string UserName;
   std::string WorkingDir;
   bool Compression;
+  std::string CompressionFormat;
   uintptr_t currAddr;
 };
 
@@ -77,6 +78,7 @@ struct ProviderListEntry {
 #define DEFAULT_PROXY_PORT 0
 #define DEFAULT_PROXY_TYPE ""
 const int MIN_SIZE_COMPRESSION = 1*10^6;
+const std::string DEFAULT_COMPRESSION_FORMAT = "gzip";
 
 /// Keep entries table per device
 struct FuncOrGblEntryTy {
