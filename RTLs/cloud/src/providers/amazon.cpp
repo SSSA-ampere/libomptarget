@@ -107,43 +107,6 @@ int32_t AmazonProvider::send_file(const char *filename,
   return OFFLOAD_SUCCESS;
 }
 
-int32_t AmazonProvider::data_submit(void *data_ptr, int64_t size,
-                                    std::string filename) {
-  int ret;
-
-  // Creating temporary file to hold data to submit
-  char tmp_name[] = "/tmp/tmpfile_XXXXXX";
-  int tmp_fd = mkstemp(tmp_name);
-
-  if (tmp_fd == -1) {
-    DP("Could not create temporary file.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  // Copying data to file
-  FILE *ftmp = fdopen(tmp_fd, "wb");
-
-  if (!ftmp) {
-    DP("Could not open temporary file.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  if (fwrite(data_ptr, 1, size, ftmp) != size) {
-    DP("Could not successfully write to temporary file.\n");
-    fclose(ftmp);
-    remove(tmp_name);
-    return OFFLOAD_FAIL;
-  }
-
-  fclose(ftmp);
-
-  ret = send_file(tmp_name, filename.c_str());
-
-  remove(tmp_name);
-
-  return ret;
-}
-
 int32_t AmazonProvider::data_retrieve(void *data_ptr, int64_t size,
                                       std::string filename) {
   if (hdfs.Compression && size >= MIN_SIZE_COMPRESSION) {

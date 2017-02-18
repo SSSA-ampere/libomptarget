@@ -142,36 +142,6 @@ void *GenericProvider::data_alloc(int64_t size, int32_t type, int32_t id) {
   return (void *)currAddr++;
 }
 
-int32_t GenericProvider::data_submit(void *data_ptr, int64_t size,
-                                     std::string filename) {
-
-  // Since we now need the hdfs file, we create it here
-  filename = hdfs.WorkingDir + filename;
-
-  DP("Submitting data to file %s\n", filename.c_str());
-
-  hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_WRONLY, 0, 0, 0);
-
-  if (file == NULL) {
-    DP("Opening failed.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  int retval = hdfsWrite(fs, file, data_ptr, size);
-  if (retval < 0) {
-    DP("Writing failed.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  retval = hdfsCloseFile(fs, file);
-  if (retval < 0) {
-    DP("Closing failed.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  return OFFLOAD_SUCCESS;
-}
-
 int32_t GenericProvider::data_retrieve(void *data_ptr, int64_t size,
                                        std::string filename) {
   int retval;

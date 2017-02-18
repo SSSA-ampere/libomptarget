@@ -58,38 +58,6 @@ int32_t GoogleProvider::send_file(const char *filename,
   return OFFLOAD_SUCCESS;
 }
 
-int32_t GoogleProvider::data_submit(void *tgt_ptr, void *hst_ptr, int64_t size,
-                                    int32_t id) {
-  // Creating temporary file to hold data to submit
-  char tmp_name[] = "/tmp/tmpfile_XXXXXX";
-  int tmp_fd = mkstemp(tmp_name);
-
-  if (tmp_fd == -1) {
-    DP("Could not create temporary file.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  // Copying data to file
-  FILE *ftmp = fdopen(tmp_fd, "wb");
-
-  if (!ftmp) {
-    DP("Could not open temporary file.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  if (fwrite(hst_ptr, 1, size, ftmp) != size) {
-    DP("Could not successfully write to temporary file.\n");
-    fclose(ftmp);
-    return OFFLOAD_FAIL;
-  }
-
-  fclose(ftmp);
-
-  // Submitting data to cloud
-  std::string final_filename = std::to_string(id);
-  return send_file(tmp_name, final_filename.c_str());
-}
-
 int32_t GoogleProvider::data_retrieve(void *hst_ptr, void *tgt_ptr,
                                       int64_t size, int32_t id) {
   // Creating temporary file to hold data retrieved
