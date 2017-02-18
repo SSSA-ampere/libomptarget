@@ -11,14 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <assert.h>
-#include <chrono>
 #include <fstream>
-#include <hdfs.h>
-#include <iostream>
-#include <thread>
-#include <unordered_map>
-#include <vector>
+
+#include <stdio.h>
+#include <stdlib.h>
 
 #include <dlfcn.h>
 #include <gelf.h>
@@ -27,19 +23,13 @@
 #include <link.h>
 #endif
 
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#include <sys/stat.h>
+#include "INIReader.h"
 
 #include "providers/amazon.h"
 #include "providers/generic.h"
-#include "rtl.h"
-
 #include "util/compression.h"
 
-#include "INIReader.h"
+#include "rtl.h"
 #include "omptarget.h"
 
 #ifndef TARGET_NAME
@@ -475,7 +465,7 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
     }
 
     if (fread(hst_ptr, 1, size, ftmp) != size) {
-      DP("Could not successfully read temporary file. => %d\n", size);
+      DP("Could not successfully read temporary file. => %ld\n", size);
       fclose(ftmp);
       remove(host_filepath.c_str());
       return OFFLOAD_FAIL;
