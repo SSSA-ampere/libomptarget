@@ -44,7 +44,6 @@ if((HDFS_FOUND) AND LIBSSH_FOUND)
         src/rtl.cpp
         src/providers/amazon.cpp
         src/providers/generic.cpp
-        src/providers/google.cpp
         src/util/ssh.cpp
     )
 
