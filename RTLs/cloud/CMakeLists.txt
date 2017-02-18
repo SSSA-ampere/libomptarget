@@ -22,22 +22,21 @@ if(NOT HDFS_FOUND)
 endif()
 
 find_package(LibSSH QUIET)
+find_package(ZLIB REQUIRED)
 
-if((HDFS_FOUND) AND LIBSSH_FOUND)
+if(HDFS_FOUND AND LIBSSH_FOUND AND ZLIB_FOUND)
 
     message("Building cloud target RTL")
 
     include_directories(
         inih  util
-        gzip_cpp/include
         ${HDFS_INCLUDE_DIR}
         ${LIBELF_INCLUDE_DIRS}
         ${LIBSSH_INCLUDE_DIRS}
+        ${ZLIB_INCLUDE_DIRS}
     )
 
     add_library(inih inih/ini.c inih/INIReader.cpp)
-
-    add_subdirectory(gzip_cpp)
 
     add_library(
         omptarget.rtl.cloud
@@ -50,19 +49,22 @@ if((HDFS_FOUND) AND LIBSSH_FOUND)
 
     target_link_libraries(omptarget.rtl.cloud
       inih
-      gzip_cpp
       ${HDFS_LIBRARIES}
       ${LIBELF_LIBRARIES}
       ${LIBSSH_LIBRARIES}
+      ${ZLIB_LIBRARIES}
     )
 
 else()
 
     if(NOT HDFS_FOUND)
-        message("LibHDFS not found in system:")
+        message("LibHDFS not found in the system")
     endif()
     if(NOT LIBSSH_FOUND)
-        message("LibSSH not found in system:")
+        message("LibSSH not found in the system")
+    endif()
+    if(NOT ZLIB_FOUND)
+        message("Zlib not found in the system")
     endif()
     message("not building cloud RTL")
 

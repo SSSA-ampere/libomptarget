@@ -28,8 +28,6 @@
 #include "generic.h"
 #include "omptarget.h"
 
-#include "gzip_cpp.h"
-
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
 #endif

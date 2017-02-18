@@ -29,8 +29,8 @@
 #include "providers/generic.h"
 #include "util/compression.h"
 
-#include "rtl.h"
 #include "omptarget.h"
+#include "rtl.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
@@ -449,7 +449,7 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 
   if (needDecompression) {
     // Decompress data directly to the host memory
-    int decomp_size = decompress_file(host_filepath, (char *)hst_ptr);
+    int decomp_size = decompress_file(host_filepath, (char *)hst_ptr, size);
     if (decomp_size != size) {
       DP("Decompressed data are not the right size. => %d\n", decomp_size);
       return OFFLOAD_FAIL;

@@ -15,8 +15,8 @@
 #define _INCLUDE_COMPRESSION_H_
 
 
-int decompress_file(std::string comp_file, char *ptr);
+size_t decompress_file(std::string comp_file, char *ptr_buff_out, size_t buff_size);
 
-int compress_to_file(std::string comp_file, char *ptr, int size);
+size_t compress_to_file(std::string comp_file, char *ptr_buff_out, size_t buff_size);
 
 #endif
