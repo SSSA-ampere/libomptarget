@@ -389,7 +389,6 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type,
                            int32_t id) {
-
   if (id >= 0) {
     // Write entry in the address table
     std::ofstream ofs(DeviceInfo.AddressTables[device_id], std::ios_base::app);
@@ -408,6 +407,13 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
     DP("No need to submit pointer\n");
     return OFFLOAD_SUCCESS;
   }
+  float sizeInMB = size / (1024 * 1024);
+  if (size > MAX_JAVA_INT) {
+    DP("Not supported: size of %d is larger (%.2fMB) than the maximal size of "
+       "JVM's bytearrays (%.2fMB).\n",
+       id, sizeInMB, MAX_SIZE_IN_MB);
+    exit(OFFLOAD_FAIL);
+  }
 
   bool needCompression = DeviceInfo.HdfsClusters[device_id].Compression &&
                          size >= MIN_SIZE_COMPRESSION;
@@ -416,9 +422,10 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   std::string filename = std::to_string(id);
   std::string host_filepath = "/tmp/" + filename;
 
+  int64_t sendingSize;
   if (needCompression) {
-    compress_to_file(host_filepath, (char *)hst_ptr, size);
-
+    DP("Compressing %.2fMB.\n", sizeInMB);
+    sendingSize = compress_to_file(host_filepath, (char *)hst_ptr, size);
   } else {
     std::ofstream tmpfile(host_filepath);
     if (!tmpfile.is_open()) {
@@ -427,8 +434,11 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
     }
     tmpfile.write((const char *)hst_ptr, size);
     tmpfile.close();
+    sendingSize = size;
   }
 
+  float sendingSizeInMB = sendingSize / (1024 * 1024);
+  DP("Uploading %.2fMB\n", sendingSizeInMB);
   int ret_val =
       DeviceInfo.Providers[device_id]->send_file(host_filepath, filename);
 
@@ -439,20 +449,30 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size, int32_t id) {
+  float sizeInMB = size / (1024 * 1024);
+  if (size > MAX_JAVA_INT) {
+    DP("Not supported: size of %d is larger (%.2fMB) than the maximal size of "
+       "JVM's bytearrays (%.2fMB).\n",
+       id, sizeInMB, MAX_SIZE_IN_MB);
+    exit(OFFLOAD_FAIL);
+  }
+
   bool needDecompression = DeviceInfo.HdfsClusters[device_id].Compression &&
                            size >= MIN_SIZE_COMPRESSION;
 
   std::string filename = std::to_string(id);
   std::string host_filepath = "/tmp/" + filename;
 
+  DP("Downloading %.2fMB.\n", sizeInMB);
   DeviceInfo.Providers[device_id]->get_file(host_filepath, filename);
 
   if (needDecompression) {
+    DP("Decompressing %.2fMB.\n", sizeInMB);
     // Decompress data directly to the host memory
     int decomp_size = decompress_file(host_filepath, (char *)hst_ptr, size);
     if (decomp_size != size) {
       DP("Decompressed data are not the right size. => %d\n", decomp_size);
-      return OFFLOAD_FAIL;
+      exit(OFFLOAD_FAIL);
     }
   } else {
 

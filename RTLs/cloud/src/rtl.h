@@ -77,8 +77,15 @@ struct ProviderListEntry {
 #define DEFAULT_PROXY_HOSTNAME ""
 #define DEFAULT_PROXY_PORT 0
 #define DEFAULT_PROXY_TYPE ""
-const int MIN_SIZE_COMPRESSION = 1*10^6;
+
+// Only data larger than about 1MB are compressed
+const int MIN_SIZE_COMPRESSION = 1000000;
 const std::string DEFAULT_COMPRESSION_FORMAT = "gzip";
+
+// Maximal size of offloaded data is about 2GB
+// Size of JVM's ByteArrays are limited by MAX_JAVA_INT = 2^31-1
+const long MAX_JAVA_INT = 2147483647;
+const float MAX_SIZE_IN_MB = MAX_JAVA_INT / (1024 * 1024);
 
 /// Keep entries table per device
 struct FuncOrGblEntryTy {
