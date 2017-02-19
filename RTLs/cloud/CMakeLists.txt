@@ -46,8 +46,8 @@ if(HDFS_FOUND AND LIBSSH_FOUND AND ZLIB_FOUND)
         src/rtl.cpp
         src/providers/amazon.cpp
         src/providers/generic.cpp
-        src/util/ssh.cpp
-        src/util/compression.cpp
+        src/util/cloud_ssh.cpp
+        src/util/cloud_compression.cpp
     )
 
     target_link_libraries(omptarget.rtl.cloud

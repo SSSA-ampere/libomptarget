@@ -20,9 +20,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <libssh/libssh.h>
-
-#include "ssh.h"
+#include "cloud_ssh.h"
 
 int ssh_verify_knownhost(ssh_session session) {
   int state;
@@ -170,6 +168,7 @@ int ssh_run(ssh_session session, const char *cmd) {
   nbytes = ssh_channel_read(channel, buffer, sizeof(buffer), 1);
   while (nbytes > 0) {
     if (fwrite(buffer, 1, nbytes, stdout) != (unsigned int)nbytes) {
+      fprintf(stderr, "Problem when displaying ssh buffer\n");
       ssh_channel_close(channel);
       ssh_channel_free(channel);
       return SSH_ERROR;
@@ -178,6 +177,7 @@ int ssh_run(ssh_session session, const char *cmd) {
   }
 
   if (nbytes < 0) {
+    fprintf(stderr, "Problem when reading ssh buffer channel\n");
     ssh_channel_close(channel);
     ssh_channel_free(channel);
     return SSH_ERROR;

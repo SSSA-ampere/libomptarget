@@ -16,12 +16,11 @@
 #include <string>
 
 #include <hdfs.h>
-#include <libssh/libssh.h>
 
 #include "INIReader.h"
 #include "omptarget.h"
 #include "rtl.h"
-#include "ssh.h"
+#include "cloud_ssh.h"
 
 #include "amazon.h"
 
@@ -135,7 +134,7 @@ int32_t AmazonProvider::submit_job() {
 
   // init ssh session
   ssh_session aws_session = ssh_new();
-  int verbosity = SSH_LOG_NOLOG;
+  int verbosity = SSH_LOG_RARE;
   int port = 22;
 
   if (aws_session == NULL)
@@ -168,7 +167,7 @@ int32_t AmazonProvider::submit_job() {
     rc = ssh_userauth_publickey(aws_session, spark.UserName.c_str(), pkey);
 
     if (rc == SSH_AUTH_ERROR) {
-      fprintf(stderr, "Authentication failed: %s\n",
+      fprintf(stderr, "SSH authentication failed: %s\n",
               ssh_get_error(aws_session));
       return (OFFLOAD_FAIL);
     }

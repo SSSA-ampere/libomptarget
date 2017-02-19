@@ -18,7 +18,7 @@
 
 #include <zlib.h>
 
-#include "compression.h"
+#include "cloud_compression.h"
 
 size_t decompress_file(std::string comp_file, char *ptr_buff_out,
                        size_t buff_size) {

@@ -20,7 +20,7 @@
 
 #include "INIReader.h"
 #include "omptarget.h"
-#include "ssh.h"
+#include "cloud_ssh.h"
 
 #include "generic.h"
 
