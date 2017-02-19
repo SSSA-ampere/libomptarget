@@ -29,7 +29,10 @@ if(HDFS_FOUND AND LIBSSH_FOUND AND ZLIB_FOUND)
     message("Building cloud target RTL")
 
     include_directories(
-        inih  util
+        src/
+        src/providers
+        src/util
+        inih
         ${HDFS_INCLUDE_DIR}
         ${LIBELF_INCLUDE_DIRS}
         ${LIBSSH_INCLUDE_DIRS}
