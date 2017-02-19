@@ -11,22 +11,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cstdio>
 #include <cstdlib>
+#include <string>
+
 #include <hdfs.h>
 #include <libssh/libssh.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-#include "../rtl.h"
-#include "../util/ssh.h"
 #include "INIReader.h"
-#include "amazon.h"
-#include "generic.h"
 #include "omptarget.h"
+#include "rtl.h"
+#include "ssh.h"
+
+#include "amazon.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
@@ -89,8 +86,8 @@ std::string AmazonProvider::get_cloud_path(std::string filename) {
   return "s3://" + ainfo.Bucket + hdfs.WorkingDir + filename;
 }
 
-int32_t AmazonProvider::send_file(const char *filename,
-                                  const char *tgtfilename) {
+int32_t AmazonProvider::send_file(std::string filename,
+                                  std::string tgtfilename) {
   std::string command = "s3cmd put ";
 
   command += std::string(filename);
@@ -106,7 +103,7 @@ int32_t AmazonProvider::send_file(const char *filename,
 }
 
 int32_t AmazonProvider::get_file(std::string host_filename,
-                                      std::string filename) {
+                                 std::string filename) {
   // Copying data from cloud
   std::string command = "s3cmd get --force ";
 

@@ -14,8 +14,7 @@
 #ifndef _INCLUDE_GENERIC_H_
 #define _INCLUDE_GENERIC_H_
 
-#include "../rtl.h"
-#include "INIReader.h"
+#include "rtl.h"
 
 const int BUFF_SIZE = 4096;
 
@@ -26,7 +25,7 @@ protected:
   hdfsFS fs;
   HdfsInfo hdfs;
   SparkInfo spark;
-  char* currAddr;
+  char *currAddr;
 
   int32_t execute_command(const char *command, bool print_result);
   int32_t submit_cluster();
@@ -37,12 +36,12 @@ public:
   GenericProvider(ResourceInfo &resources) {
     hdfs = resources.HDFSInfo;
     spark = resources.Spark;
-    currAddr = (char *) 1;
+    currAddr = (char *)1;
   }
 
   virtual int32_t parse_config(INIReader reader);
   virtual int32_t init_device();
-  virtual int32_t send_file(const char *filename, const char *tgtfilename);
+  virtual int32_t send_file(std::string filename, std::string tgtfilename);
   virtual int32_t get_file(std::string host_filename, std::string filename);
   virtual void *data_alloc(int64_t size, int32_t type, int32_t id);
   virtual int32_t delete_file(std::string filename);

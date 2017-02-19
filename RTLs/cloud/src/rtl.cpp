@@ -25,9 +25,9 @@
 
 #include "INIReader.h"
 
-#include "providers/amazon.h"
-#include "providers/generic.h"
-#include "util/compression.h"
+#include "amazon.h"
+#include "generic.h"
+#include "compression.h"
 
 #include "omptarget.h"
 #include "rtl.h"
@@ -430,7 +430,7 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   }
 
   int ret_val = DeviceInfo.Providers[device_id]->send_file(
-      host_filepath.c_str(), filename.c_str());
+      host_filepath, filename);
 
   remove(host_filepath.c_str());
 

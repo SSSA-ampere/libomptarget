@@ -11,21 +11,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+
 #include <hdfs.h>
 #include <libssh/libssh.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <thread>
 
-#include <sys/stat.h>
-#include <sys/types.h>
-
-#include "../rtl.h"
-#include "../util/ssh.h"
 #include "INIReader.h"
-#include "generic.h"
 #include "omptarget.h"
+#include "ssh.h"
+
+#include "generic.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
@@ -73,13 +70,14 @@ int32_t GenericProvider::init_device() {
   return OFFLOAD_SUCCESS;
 }
 
-int32_t GenericProvider::send_file(const char *filename,
-                                   const char *tgtfilename) {
+int32_t GenericProvider::send_file(std::string filename,
+                                   std::string tgtfilename) {
   std::string final_name = hdfs.WorkingDir + std::string(tgtfilename);
 
-  DP("submitting file %s as %s\n", filename, final_name.c_str());
+  DP("submitting file %s as %s\n", filename.c_str(), final_name.c_str());
 
-  hdfsFile file = hdfsOpenFile(fs, final_name.c_str(), O_WRONLY, BUFF_SIZE, 0, 0);
+  hdfsFile file =
+      hdfsOpenFile(fs, final_name.c_str(), O_WRONLY, BUFF_SIZE, 0, 0);
 
   if (file == NULL) {
     DP("Opening file in HDFS failed.\n");
@@ -89,7 +87,7 @@ int32_t GenericProvider::send_file(const char *filename,
   std::ifstream hstfile(filename, std::ios::in | std::ios::binary);
 
   if (!hstfile.is_open()) {
-    DP("Opening host file %s failed.", filename);
+    DP("Opening host file %s failed.", filename.c_str());
     hdfsCloseFile(fs, file);
     return OFFLOAD_FAIL;
   }
@@ -141,7 +139,7 @@ void *GenericProvider::data_alloc(int64_t size, int32_t type, int32_t id) {
 }
 
 int32_t GenericProvider::get_file(std::string host_filename,
-                                      std::string filename) {
+                                  std::string filename) {
   filename = hdfs.WorkingDir + filename;
 
   std::ofstream hostfile(host_filename);
@@ -170,7 +168,7 @@ int32_t GenericProvider::get_file(std::string host_filename,
   int current_pos = 0;
 
   do {
-    retval = hdfsRead(fs, file, (void *) buffer, BUFF_SIZE);
+    retval = hdfsRead(fs, file, (void *)buffer, BUFF_SIZE);
     if (retval < 0) {
       DP("Reading failed.\n");
       return OFFLOAD_FAIL;

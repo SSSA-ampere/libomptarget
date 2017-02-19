@@ -20,8 +20,9 @@
 
 int ssh_verify_knownhost(ssh_session session);
 
-int ssh_copy(ssh_session session, const char* filename, const char* destpath, const char* destname);
+int ssh_copy(ssh_session session, const char *filename, const char *destpath,
+             const char *destname);
 
-int ssh_run(ssh_session session, const char* cmd);
+int ssh_run(ssh_session session, const char *cmd);
 
 #endif

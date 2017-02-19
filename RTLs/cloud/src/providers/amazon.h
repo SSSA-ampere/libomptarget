@@ -14,11 +14,8 @@
 #ifndef _INCLUDE_AMAZON_H_
 #define _INCLUDE_AMAZON_H_
 
-#include "../rtl.h"
-#include "INIReader.h"
-
-#include "../util/ssh.h"
 #include "generic.h"
+#include "rtl.h"
 
 struct AmazonInfo {
   std::string Bucket;
@@ -45,7 +42,7 @@ public:
 
   virtual int32_t parse_config(INIReader reader);
   virtual int32_t init_device();
-  virtual int32_t send_file(const char *filename, const char *tgtfilename);
+  virtual int32_t send_file(std::string filename, std::string tgtfilename);
   virtual int32_t get_file(std::string host_filename, std::string filename);
   virtual int32_t delete_file(std::string filename);
   virtual int32_t submit_job();
