@@ -21,8 +21,8 @@
 
 #include "compression.h"
 
-
-size_t decompress_file(std::string comp_file, char *ptr_buff_out, size_t buff_size) {
+size_t decompress_file(std::string comp_file, char *ptr_buff_out,
+                       size_t buff_size) {
   int err;
   gzFile in = gzopen(comp_file.c_str(), "rb");
   int len = gzread(in, ptr_buff_out, buff_size);
@@ -32,7 +32,8 @@ size_t decompress_file(std::string comp_file, char *ptr_buff_out, size_t buff_si
   return len;
 }
 
-size_t compress_to_file(std::string comp_file, char *ptr_buff_in, size_t buff_size) {
+size_t compress_to_file(std::string comp_file, char *ptr_buff_in,
+                        size_t buff_size) {
   int err;
   gzFile out = gzopen(comp_file.c_str(), "wb");
   int len = gzwrite(out, ptr_buff_in, buff_size);
