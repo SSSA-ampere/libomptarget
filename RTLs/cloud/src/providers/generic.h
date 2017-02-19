@@ -26,7 +26,7 @@ protected:
   hdfsFS fs;
   HdfsInfo hdfs;
   SparkInfo spark;
-  int32_t currAddr;
+  char* currAddr;
 
   int32_t execute_command(const char *command, bool print_result);
   int32_t submit_cluster();
@@ -37,7 +37,7 @@ public:
   GenericProvider(ResourceInfo &resources) {
     hdfs = resources.HDFSInfo;
     spark = resources.Spark;
-    currAddr = 1;
+    currAddr = (char *) 1;
   }
 
   virtual int32_t parse_config(INIReader reader);
