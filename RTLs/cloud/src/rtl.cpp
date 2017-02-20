@@ -229,6 +229,13 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       reader.Get("Spark", "AdditionalArgs", ""),
   };
 
+  if (spark.ServAddress.empty()) {
+    // Look for env variable defining Spark hostname
+    if (char *enServAddress = std::getenv("OMPCLOUD_SPARK_HOSTNAME")) {
+      spark.ServAddress = std::string(enServAddress);
+    }
+  }
+
   if (spark.Mode == SparkMode::invalid || !spark.Package.compare("") ||
       !spark.JarPath.compare("")) {
     DP("Invalid values in 'cloud_rtl.ini' for Spark!");
