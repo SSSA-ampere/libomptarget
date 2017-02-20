@@ -21,6 +21,7 @@
 #include "INIReader.h"
 #include "omptarget.h"
 #include "cloud_ssh.h"
+#include "cloud_util.h"
 
 #include "generic.h"
 
@@ -394,29 +395,4 @@ std::string GenericProvider::get_job_args() {
     args += " false";
 
   return args;
-}
-
-int32_t GenericProvider::execute_command(const char *command,
-                                         bool print_result) {
-  FILE *fp = popen(command, "r");
-
-  if (fp == NULL) {
-    DP("Failed to execute command.\n");
-    return EXIT_FAILURE;
-  }
-
-  if (print_result) {
-    char buf[512] = {0};
-    uint read = 0;
-
-    while ((read = fread(buf, sizeof(char), 511, fp)) == 512) {
-      buf[511] = 0;
-      DP("%s", buf);
-    }
-
-    buf[read] = 0;
-    DP("%s", buf);
-  }
-
-  return pclose(fp);
 }

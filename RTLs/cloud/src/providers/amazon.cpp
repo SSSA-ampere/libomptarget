@@ -19,6 +19,7 @@
 
 #include "INIReader.h"
 #include "cloud_ssh.h"
+#include "cloud_util.h"
 #include "omptarget.h"
 #include "rtl.h"
 
