@@ -16,6 +16,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <thread>
 
 #include <dlfcn.h>
 #include <gelf.h>
@@ -77,7 +78,9 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
   SparkClusters.resize(NumberOfDevices);
   HdfsNodes.resize(NumberOfDevices);
   Providers.resize(NumberOfDevices);
-  ElapsedTimes.resize(NumberOfDevices);
+  ElapsedTimes = std::vector<ElapsedTime>(NumberOfDevices);
+  submitting_threads.resize(NumberOfDevices);
+  retrieving_threads.resize(NumberOfDevices);
 
   for (int i = 0; i < NumberOfDevices; i++) {
     char *tmpname = strdup("/tmp/tmpfileXXXXXX");
@@ -100,8 +103,8 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
 }
 
 RTLDeviceInfoTy::~RTLDeviceInfoTy() {
-  for(int i=0; i<NumberOfDevices; i++){
-    ElapsedTime timing = DeviceInfo.ElapsedTimes[i];
+  for (int i = 0; i < NumberOfDevices; i++) {
+    ElapsedTime &timing = DeviceInfo.ElapsedTimes[i];
     DP("Uploading = %ds\n", timing.UploadTime);
     DP("Downloading = %ds\n", timing.DownloadTime);
     DP("Compression = %ds\n", timing.CompressionTime);
@@ -411,13 +414,8 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type,
   return DeviceInfo.Providers[device_id]->data_alloc(size, type, id);
 }
 
-int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
-                              int64_t size, int32_t id) {
-  ElapsedTime timing = DeviceInfo.ElapsedTimes[device_id];
-  if (id < 0) {
-    DP("No need to submit pointer\n");
-    return OFFLOAD_SUCCESS;
-  }
+static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
+                           int64_t size, int32_t id) {
   float sizeInMB = size / (1024 * 1024);
   if (size > MAX_JAVA_INT) {
     DP("Not supported: size of %d is larger (%.2fMB) than the maximal size of "
@@ -425,6 +423,8 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
        id, sizeInMB, MAX_SIZE_IN_MB);
     exit(OFFLOAD_FAIL);
   }
+
+  ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
 
   bool needCompression = DeviceInfo.HdfsClusters[device_id].Compression &&
                          size >= MIN_SIZE_COMPRESSION;
@@ -441,7 +441,9 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
     auto t_delay =
         std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start)
             .count();
-    timing.CompressionTime=+t_delay;
+    timing.CompressionTime_mutex.lock();
+    timing.CompressionTime += t_delay;
+    timing.CompressionTime_mutex.unlock();
     DP("Compressed %.1fMB in %lds\n", sizeInMB, t_delay);
 
   } else {
@@ -462,7 +464,9 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   auto t_end = std::chrono::high_resolution_clock::now();
   auto t_delay =
       std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
-  timing.UploadTime=+t_delay;
+  timing.UploadTime_mutex.lock();
+  timing.UploadTime += t_delay;
+  timing.UploadTime_mutex.unlock();
   DP("Uploaded %.1fMB in %lds\n", sendingSizeInMB, t_delay);
 
   remove(host_filepath.c_str());
@@ -470,9 +474,8 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   return ret_val;
 }
 
-int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
-                                int64_t size, int32_t id) {
-  ElapsedTime timing = DeviceInfo.ElapsedTimes[device_id];
+static int32_t data_retrieve(int32_t device_id, void *tgt_ptr, void *hst_ptr,
+                             int64_t size, int32_t id) {
   float sizeInMB = size / (1024 * 1024);
   if (size > MAX_JAVA_INT) {
     DP("Not supported: size of %d is larger (%.1fMB) than the maximal size of "
@@ -480,6 +483,8 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
        id, sizeInMB, MAX_SIZE_IN_MB);
     exit(OFFLOAD_FAIL);
   }
+
+  ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
 
   bool needDecompression = DeviceInfo.HdfsClusters[device_id].Compression &&
                            size >= MIN_SIZE_COMPRESSION;
@@ -492,7 +497,9 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
   auto t_end = std::chrono::high_resolution_clock::now();
   auto t_delay =
       std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
-  timing.DownloadTime=+t_delay;
+  timing.DownloadTime_mutex.lock();
+  timing.DownloadTime += t_delay;
+  timing.DownloadTime_mutex.unlock();
   DP("Downloaded %.1fMB in %lds\n", sizeInMB, t_delay);
 
   if (needDecompression) {
@@ -507,7 +514,8 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
     auto t_delay =
         std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start)
             .count();
-    timing.DecompressionTime=+t_delay;
+
+    timing.DecompressionTime += t_delay;
     DP("Decompressed %.1fMB in %lds\n", sizeInMB, t_delay);
 
   } else {
@@ -535,6 +543,26 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
   return OFFLOAD_SUCCESS;
 }
 
+int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
+                              int64_t size, int32_t id) {
+  if (id < 0) {
+    DP("No need to submit pointer\n");
+    return OFFLOAD_SUCCESS;
+  }
+
+  DeviceInfo.submitting_threads[device_id].push_back(
+      std::thread(data_submit, device_id, tgt_ptr, hst_ptr, size, id));
+  return OFFLOAD_SUCCESS;
+}
+
+int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
+                                int64_t size, int32_t id) {
+  std::thread thread_retrieve(data_retrieve, device_id, tgt_ptr, hst_ptr, size,
+                              id);
+  thread_retrieve.join();
+  return OFFLOAD_SUCCESS;
+}
+
 int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr, int32_t id) {
   if (id < 0) {
     DP("No file to delete\n");
@@ -549,17 +577,22 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
                                          void **tgt_args, int32_t arg_num,
                                          int32_t team_num,
                                          int32_t thread_limit) {
-  ElapsedTime timing = DeviceInfo.ElapsedTimes[device_id];
+  ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
   const char *fileName = DeviceInfo.AddressTables[device_id].c_str();
   DeviceInfo.Providers[device_id]->send_file(fileName, "addressTable");
   remove(fileName);
+
+  for (auto it = DeviceInfo.submitting_threads[device_id].begin();
+       it != DeviceInfo.submitting_threads[device_id].end(); it++) {
+    (*it).join();
+  }
 
   auto t_start = std::chrono::high_resolution_clock::now();
   int32_t ret_val = DeviceInfo.Providers[device_id]->submit_job();
   auto t_end = std::chrono::high_resolution_clock::now();
   auto t_delay =
       std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
-  timing.SparkExecutionTime=+t_delay;
+  timing.SparkExecutionTime += t_delay;
   DP("Spark job executed in %lds\n", t_delay);
 
   return ret_val;

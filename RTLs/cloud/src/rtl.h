@@ -7,6 +7,8 @@
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <thread>
+#include <mutex>
 #include <vector>
 
 #include "INIReader.h"
@@ -20,7 +22,7 @@ struct DynLibTy {
   void *Handle;
 };
 
-extern const char *__progname;	/* for job name */
+extern const char *__progname; /* for job name */
 
 struct HdfsInfo {
   std::string ServAddress;
@@ -66,11 +68,15 @@ struct ProviderListEntry {
 };
 
 struct ElapsedTime {
-  int CompressionTime;
-  int DecompressionTime;
-  int UploadTime;
-  int DownloadTime;
-  int SparkExecutionTime;
+  int CompressionTime = 0;
+  std::mutex CompressionTime_mutex;
+  int DecompressionTime = 0;
+  std::mutex DecompressionTime_mutex;
+  int UploadTime = 0;
+  std::mutex UploadTime_mutex;
+  int DownloadTime = 0;
+  std::mutex DownloadTime_mutex;
+  int SparkExecutionTime = 0;
 };
 
 #define OMPCLOUD_CONF_ENV "OMPCLOUD_CONF_PATH"
@@ -114,6 +120,9 @@ public:
   std::vector<GenericProvider *> Providers;
   std::vector<std::string> AddressTables;
   std::vector<ElapsedTime> ElapsedTimes;
+
+  std::vector<std::vector<std::thread>> submitting_threads;
+  std::vector<std::vector<std::thread>> retrieving_threads;
 
   // Record entry point associated with device
   void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin,
