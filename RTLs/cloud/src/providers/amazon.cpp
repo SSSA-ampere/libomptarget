@@ -41,7 +41,7 @@ GenericProvider *createAmazonProvider(ResourceInfo &resources) {
 
 int32_t AmazonProvider::parse_config(INIReader reader) {
   ainfo.Bucket = reader.Get("AmazonProvider", "Bucket", DEFAULT_AWS_BUCKET);
-  if (ainfo.AccessKey.empty())
+  if (ainfo.Bucket.empty())
     DP("Did not find S3 bucket name, use default.\n");
 
   if (char *envAccessKey = std::getenv("AWS_ACCESS_KEY_ID")) {
