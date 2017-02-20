@@ -18,9 +18,9 @@
 #include <hdfs.h>
 
 #include "INIReader.h"
+#include "cloud_ssh.h"
 #include "omptarget.h"
 #include "rtl.h"
-#include "cloud_ssh.h"
 
 #include "amazon.h"
 

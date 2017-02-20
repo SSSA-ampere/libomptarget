@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef _INCLUDE_UTIL_H_
-#define _INCLUDE_UTIL_H_
+#ifndef _INCLUDE_SSH_H_
+#define _INCLUDE_SSH_H_
 
 #include <libssh/libssh.h>
 
