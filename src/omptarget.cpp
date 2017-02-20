@@ -83,6 +83,7 @@ struct DeviceTy {
 
   int32_t data_submit(void* TgtPtrBegin, void* HstPtrBegin, int64_t Size, int32_t Id);
   int32_t data_retrieve(void* HstPtrBegin, void* TgtPtrBegin, int64_t Size, int32_t Id);
+  int32_t run_barrier_end();
 
   int32_t run_region(void* TgtEntryPtr, void** TgtVarsPtr, int32_t TgtVarsSize);
   int32_t run_team_region(void* TgtEntryPtr, void** TgtVarsPtr,
@@ -98,6 +99,7 @@ struct RTLInfoTy{
   typedef int32_t (data_submit_ty)(int32_t, void*, void*, int64_t, int32_t);
   typedef int32_t (data_retrieve_ty)(int32_t, void*, void*, int64_t, int32_t);
   typedef int32_t (data_delete_ty)(int32_t, void*, int32_t);
+  typedef int32_t (run_barrier_end_ty)(int32_t);
   typedef int32_t (run_region_ty)(int32_t, void*, void**, int32_t);
   typedef int32_t (run_team_region_ty)(int32_t, void*, void**, int32_t, int32_t, int32_t);
 
@@ -116,6 +118,7 @@ struct RTLInfoTy{
   data_submit_ty *data_submit;
   data_retrieve_ty *data_retrieve;
   data_delete_ty *data_delete;
+  run_barrier_end_ty *run_barrier_end;
   run_region_ty *run_region;
   run_team_region_ty *run_team_region;
 };
@@ -338,6 +341,12 @@ int32_t DeviceTy::data_retrieve(void* HstPtrBegin, void* TgtPtrBegin,
 }
 
 // run region on device
+int32_t DeviceTy::run_barrier_end()
+{
+  return RTL->run_barrier_end(RTLDeviceID);
+}
+
+// run region on device
 int32_t DeviceTy::run_region(void* TgtEntryPtr, void** TgtVarsPtr,
   int32_t TgtVarsSize)
 {
@@ -501,6 +510,7 @@ EXTERN void __tgt_register_lib(__tgt_bin_desc *desc){
     if (!(R.data_submit       = (RTLInfoTy::data_submit_ty*)      dlsym(dynlib_handle, "__tgt_rtl_data_submit"))) continue;
     if (!(R.data_retrieve     = (RTLInfoTy::data_retrieve_ty*)    dlsym(dynlib_handle, "__tgt_rtl_data_retrieve"))) continue;
     if (!(R.data_delete       = (RTLInfoTy::data_delete_ty*)      dlsym(dynlib_handle, "__tgt_rtl_data_delete"))) continue;
+    if (!(R.run_barrier_end   = (RTLInfoTy::run_barrier_end_ty*)  dlsym(dynlib_handle, "__tgt_rtl_run_barrier_end"))) continue;
     if (!(R.run_region        = (RTLInfoTy::run_region_ty*)       dlsym(dynlib_handle, "__tgt_rtl_run_target_region"))) continue;
     if (!(R.run_team_region   = (RTLInfoTy::run_team_region_ty*)  dlsym(dynlib_handle, "__tgt_rtl_run_target_team_region"))) continue;
 
@@ -692,7 +702,8 @@ static int target_data_end(DeviceTy & Device, int32_t arg_num,
   auto t_delay = std::chrono::duration_cast<std::chrono::seconds>(t_end-t_start).count();
   DP("Offload from device in %0lds\n", t_delay);
 
-  return OFFLOAD_SUCCESS;
+  res = Device.run_barrier_end();
+  return res;
 }
 
 /// passes data from the target, release target memory and destroys

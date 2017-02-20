@@ -273,6 +273,10 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void* tgt_ptr){
   return OFFLOAD_SUCCESS;
 }
 
+int32_t __tgt_rtl_run_barrier_end(int32_t device_id){
+  return OFFLOAD_SUCCESS;
+}
+
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
    void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit)
 {
