@@ -13,23 +13,23 @@
 
 #include <fstream>
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
 
 #include <dlfcn.h>
 #include <gelf.h>
-#include <string.h>
 #ifndef __APPLE__
 #include <link.h>
 #endif
+#include <string.h>
 
 #include "INIReader.h"
-
 #include "amazon.h"
 #include "cloud_compression.h"
 #include "generic.h"
-
 #include "omptarget.h"
+
 #include "rtl.h"
 
 #ifndef TARGET_NAME
@@ -77,6 +77,7 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
   SparkClusters.resize(NumberOfDevices);
   HdfsNodes.resize(NumberOfDevices);
   Providers.resize(NumberOfDevices);
+  ElapsedTimes.resize(NumberOfDevices);
 
   for (int i = 0; i < NumberOfDevices; i++) {
     char *tmpname = strdup("/tmp/tmpfileXXXXXX");
@@ -99,6 +100,15 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
 }
 
 RTLDeviceInfoTy::~RTLDeviceInfoTy() {
+  for(int i=0; i<NumberOfDevices; i++){
+    ElapsedTime timing = DeviceInfo.ElapsedTimes[i];
+    DP("Uploading = %ds\n", timing.UploadTime);
+    DP("Downloading = %ds\n", timing.DownloadTime);
+    DP("Compression = %ds\n", timing.CompressionTime);
+    DP("Decompression = %ds\n", timing.DecompressionTime);
+    DP("Execution = %ds\n", timing.SparkExecutionTime);
+  }
+
   // Disconnecting clouds
   DP("Disconnecting HDFS server(s)\n");
   for (int i = 0; i < HdfsNodes.size(); i++) {
@@ -403,6 +413,7 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type,
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
                               int64_t size, int32_t id) {
+  ElapsedTime timing = DeviceInfo.ElapsedTimes[device_id];
   if (id < 0) {
     DP("No need to submit pointer\n");
     return OFFLOAD_SUCCESS;
@@ -424,8 +435,15 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
   int64_t sendingSize;
   if (needCompression) {
-    DP("Compressing %.2fMB.\n", sizeInMB);
+    auto t_start = std::chrono::high_resolution_clock::now();
     sendingSize = compress_to_file(host_filepath, (char *)hst_ptr, size);
+    auto t_end = std::chrono::high_resolution_clock::now();
+    auto t_delay =
+        std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start)
+            .count();
+    timing.CompressionTime=+t_delay;
+    DP("Compressed %.1fMB in %lds\n", sizeInMB, t_delay);
+
   } else {
     std::ofstream tmpfile(host_filepath);
     if (!tmpfile.is_open()) {
@@ -438,9 +456,14 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   }
 
   float sendingSizeInMB = sendingSize / (1024 * 1024);
-  DP("Uploading %.2fMB\n", sendingSizeInMB);
+  auto t_start = std::chrono::high_resolution_clock::now();
   int ret_val =
       DeviceInfo.Providers[device_id]->send_file(host_filepath, filename);
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_delay =
+      std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
+  timing.UploadTime=+t_delay;
+  DP("Uploaded %.1fMB in %lds\n", sendingSizeInMB, t_delay);
 
   remove(host_filepath.c_str());
 
@@ -449,10 +472,11 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size, int32_t id) {
+  ElapsedTime timing = DeviceInfo.ElapsedTimes[device_id];
   float sizeInMB = size / (1024 * 1024);
   if (size > MAX_JAVA_INT) {
-    DP("Not supported: size of %d is larger (%.2fMB) than the maximal size of "
-       "JVM's bytearrays (%.2fMB).\n",
+    DP("Not supported: size of %d is larger (%.1fMB) than the maximal size of "
+       "JVM's bytearrays (%.1fMB).\n",
        id, sizeInMB, MAX_SIZE_IN_MB);
     exit(OFFLOAD_FAIL);
   }
@@ -463,17 +487,29 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
   std::string filename = std::to_string(id);
   std::string host_filepath = "/tmp/" + filename;
 
-  DP("Downloading %.2fMB.\n", sizeInMB);
+  auto t_start = std::chrono::high_resolution_clock::now();
   DeviceInfo.Providers[device_id]->get_file(host_filepath, filename);
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_delay =
+      std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
+  timing.DownloadTime=+t_delay;
+  DP("Downloaded %.1fMB in %lds\n", sizeInMB, t_delay);
 
   if (needDecompression) {
-    DP("Decompressing %.2fMB.\n", sizeInMB);
+    auto t_start = std::chrono::high_resolution_clock::now();
     // Decompress data directly to the host memory
     int decomp_size = decompress_file(host_filepath, (char *)hst_ptr, size);
     if (decomp_size != size) {
       DP("Decompressed data are not the right size. => %d\n", decomp_size);
       exit(OFFLOAD_FAIL);
     }
+    auto t_end = std::chrono::high_resolution_clock::now();
+    auto t_delay =
+        std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start)
+            .count();
+    timing.DecompressionTime=+t_delay;
+    DP("Decompressed %.1fMB in %lds\n", sizeInMB, t_delay);
+
   } else {
 
     // Reading contents of temporary file
@@ -513,11 +549,20 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
                                          void **tgt_args, int32_t arg_num,
                                          int32_t team_num,
                                          int32_t thread_limit) {
+  ElapsedTime timing = DeviceInfo.ElapsedTimes[device_id];
   const char *fileName = DeviceInfo.AddressTables[device_id].c_str();
   DeviceInfo.Providers[device_id]->send_file(fileName, "addressTable");
   remove(fileName);
 
-  return DeviceInfo.Providers[device_id]->submit_job();
+  auto t_start = std::chrono::high_resolution_clock::now();
+  int32_t ret_val = DeviceInfo.Providers[device_id]->submit_job();
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_delay =
+      std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
+  timing.SparkExecutionTime=+t_delay;
+  DP("Spark job executed in %lds\n", t_delay);
+
+  return ret_val;
 }
 
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,

@@ -65,6 +65,14 @@ struct ProviderListEntry {
   std::string SectionName;
 };
 
+struct ElapsedTime {
+  int CompressionTime;
+  int DecompressionTime;
+  int UploadTime;
+  int DownloadTime;
+  int SparkExecutionTime;
+};
+
 #define OMPCLOUD_CONF_ENV "OMPCLOUD_CONF_PATH"
 #define DEFAULT_OMPCLOUD_CONF_FILE "ompcloud-conf.ini"
 #define DEFAULT_HDFS_PORT 9000
@@ -105,6 +113,7 @@ public:
   std::vector<hdfsFS> HdfsNodes;
   std::vector<GenericProvider *> Providers;
   std::vector<std::string> AddressTables;
+  std::vector<ElapsedTime> ElapsedTimes;
 
   // Record entry point associated with device
   void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin,
