@@ -569,7 +569,10 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr, int32_t id) {
   }
 
   std::string filename = std::to_string(id);
-  return DeviceInfo.Providers[device_id]->delete_file(filename);
+  // FIXME: Check retrieving thread is over before deleting data
+  //return DeviceInfo.Providers[device_id]->delete_file(filename);
+
+  return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_run_barrier_end(int32_t device_id) {
