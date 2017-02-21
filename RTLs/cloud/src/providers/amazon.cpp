@@ -178,23 +178,22 @@ int32_t AmazonProvider::submit_job() {
   DP("Send Spark jar file\n");
   ssh_copy(aws_session, spark.JarPath.c_str(), "/tmp/", "spark_job.jar");
 
+  // Run Spark
+  std::string cmd = "export AWS_ACCESS_KEY_ID=" + ainfo.AccessKey +
+                    " && export AWS_SECRET_ACCESS_KEY=" + ainfo.SecretKey +
+                    " && " + spark.BinPath + "spark-submit --name " + "\"" +
+                    __progname + "\"" + " --master spark://" +
+                    spark.ServAddress + ":" + std::to_string(spark.ServPort) +
+                    " " + spark.AdditionalArgs + " --class " + spark.Package +
+                    " /tmp/spark_job.jar " + get_job_args() + " " +
+                    ainfo.AccessKey + " " + ainfo.SecretKey;
+
+  rc = ssh_run(aws_session, cmd.c_str());
+
   ssh_disconnect(aws_session);
   ssh_free(aws_session);
 
-  // Run Spark
   /*
-  std::string oldcmd =
-      "export AWS_ACCESS_KEY_ID=" + ainfo.AccessKey +
-      " && export AWS_SECRET_ACCESS_KEY=" + ainfo.SecretKey + " && " +
-      spark.BinPath + "spark-submit --name " + "\"" + __progname + "\"" +
-      " --master spark://" + spark.ServAddress + ":" +
-      std::to_string(spark.ServPort) + " " + spark.AdditionalArgs +
-      " --class " + spark.Package + " /tmp/spark_job.jar " + get_job_args() +
-      " " + ainfo.AccessKey + " " + ainfo.SecretKey;
-
-  rc = ssh_run(aws_session, cmd.c_str());
-  */
-
   std::ofstream out("/tmp/_ompcloud_script.sh");
   out << "export AWS_ACCESS_KEY_ID=" + ainfo.AccessKey + "\n";
   out << "export AWS_SECRET_ACCESS_KEY=" + ainfo.SecretKey + "\n";
@@ -210,6 +209,7 @@ int32_t AmazonProvider::submit_job() {
   execute_command(cmd.c_str(), true);
 
   remove("/tmp/_ompcloud_script.sh");
+  */
 
   return rc;
 }
