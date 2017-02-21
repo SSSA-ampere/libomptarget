@@ -481,7 +481,7 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   return ret_val;
 }
 
-static int32_t data_retrieve(int32_t device_id, void *tgt_ptr, void *hst_ptr,
+static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                              int64_t size, int32_t id) {
   float sizeInMB = size / (1024 * 1024);
   if (size > MAX_JAVA_INT) {
@@ -522,7 +522,9 @@ static int32_t data_retrieve(int32_t device_id, void *tgt_ptr, void *hst_ptr,
         std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start)
             .count();
 
+    timing.DecompressionTime_mutex.lock();
     timing.DecompressionTime += t_delay;
+    timing.DecompressionTime_mutex.unlock();
     DP("Decompressed %.1fMB in %lds\n", sizeInMB, t_delay);
 
   } else {
@@ -565,7 +567,7 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size, int32_t id) {
   DeviceInfo.retrieving_threads[device_id].push_back(
-      std::thread(data_retrieve, device_id, tgt_ptr, hst_ptr, size, id));
+      std::thread(data_retrieve, device_id, hst_ptr, tgt_ptr, size, id));
   return OFFLOAD_SUCCESS;
 }
 
@@ -577,7 +579,7 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr, int32_t id) {
 
   std::string filename = std::to_string(id);
   // FIXME: Check retrieving thread is over before deleting data
-  //return DeviceInfo.Providers[device_id]->delete_file(filename);
+  // return DeviceInfo.Providers[device_id]->delete_file(filename);
 
   return OFFLOAD_SUCCESS;
 }
