@@ -135,7 +135,7 @@ int32_t AmazonProvider::submit_job() {
 
   // init ssh session
   ssh_session aws_session = ssh_new();
-  int verbosity = SSH_LOG_RARE;
+  int verbosity = SSH_LOG_NOLOG;
   int port = 22;
 
   if (aws_session == NULL)
