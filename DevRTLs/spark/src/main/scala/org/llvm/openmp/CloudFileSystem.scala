@@ -31,7 +31,7 @@ object AddressTable {
 
 class CloudFileSystem(fs: FileSystem, path: String, compressOption: String) {
 
-  val MIN_SIZE_COMPRESSION = 1 * 10 ^ 6
+  val MIN_SIZE_COMPRESSION = 1000000
 
   val ccf = new CompressionCodecFactory(new Configuration)
   
