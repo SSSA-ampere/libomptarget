@@ -15,8 +15,6 @@
 #include <cstdlib>
 #include <string>
 
-#include <hdfs.h>
-
 #include "INIReader.h"
 #include "cloud_ssh.h"
 #include "cloud_util.h"
@@ -33,8 +31,6 @@
 #define GETNAME(name) GETNAME2(name)
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Amazon Provider:", __VA_ARGS__)
-
-// ./spark-ec2 -k <keypair> -i <key-file> -s <num-slaves> launch <cluster-name>
 
 GenericProvider *createAmazonProvider(ResourceInfo &resources) {
   return new AmazonProvider(resources);

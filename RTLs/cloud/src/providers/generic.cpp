@@ -16,7 +16,6 @@
 #include <string>
 
 #include <hdfs.h>
-#include <libssh/libssh.h>
 
 #include "INIReader.h"
 #include "omptarget.h"
