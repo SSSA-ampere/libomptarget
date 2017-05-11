@@ -20,9 +20,23 @@
 
 #include "cloud_util.h"
 
+std::string exec_cmd(const char* cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) throw std::runtime_error("popen() failed!");
+    while (!feof(pipe.get())) {
+        if (fgets(buffer.data(), 128, pipe.get()) != NULL)
+            result += buffer.data();
+    }
+    return result;
+}
+
 
 int32_t execute_command(const char *command, bool print_result) {
   FILE *fp = popen(command, "r");
+
+  //fprintf(stdout, "Running: %s\n", command);
 
   if (fp == NULL) {
     fprintf(stderr, "Failed to execute command.\n");

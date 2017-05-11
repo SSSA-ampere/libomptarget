@@ -14,6 +14,8 @@
 #ifndef _INCLUDE_UTIL_H_
 #define _INCLUDE_UTIL_H_
 
+std::string exec_cmd(const char* cmd);
+
 int32_t execute_command(const char *command, bool print_result);
 
 #endif
