@@ -29,6 +29,7 @@
 #include "amazon.h"
 #include "cloud_compression.h"
 #include "generic.h"
+#include "azure.h"
 #include "omptarget.h"
 
 #include "rtl.h"
@@ -43,7 +44,7 @@
 
 static std::vector<struct ProviderListEntry> ExistingProviderList = {
     {"Generic", createGenericProvider, "GenericProvider"},
-    {"Google", NULL, "GoogleProvider"},
+    {"Azure", createAzureProvider, "AzureProvider"},
     {"AWS", createAmazonProvider, "AmazonProvider"}};
 
 static std::vector<struct ProviderListEntry> ProviderList;
