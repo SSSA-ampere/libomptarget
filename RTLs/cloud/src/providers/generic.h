@@ -14,29 +14,21 @@
 #ifndef _INCLUDE_GENERIC_H_
 #define _INCLUDE_GENERIC_H_
 
+#include "provider.h"
 #include "rtl.h"
 
-const int BUFF_SIZE = 4096;
+CloudProvider *createGenericProvider(ResourceInfo &resources);
 
-GenericProvider *createGenericProvider(ResourceInfo &resources);
-
-class GenericProvider {
+class GenericProvider : public CloudProvider  {
 protected:
   hdfsFS fs;
-  HdfsInfo hdfs;
-  SparkInfo spark;
-  char *currAddr;
 
   int32_t submit_cluster();
   int32_t submit_local();
   int32_t submit_condor();
 
 public:
-  GenericProvider(ResourceInfo &resources) {
-    hdfs = resources.HDFSInfo;
-    spark = resources.Spark;
-    currAddr = (char *)1;
-  }
+  GenericProvider(ResourceInfo resources) : CloudProvider(resources) {}
 
   virtual int32_t parse_config(INIReader reader);
   virtual int32_t init_device();

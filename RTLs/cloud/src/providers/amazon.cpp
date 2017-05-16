@@ -32,7 +32,7 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Amazon Provider:", __VA_ARGS__)
 
-GenericProvider *createAmazonProvider(ResourceInfo &resources) {
+CloudProvider *createAmazonProvider(ResourceInfo &resources) {
   return new AmazonProvider(resources);
 }
 

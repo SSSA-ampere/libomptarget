@@ -34,7 +34,7 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Azure Provider:", __VA_ARGS__)
 
-GenericProvider *createAzureProvider(ResourceInfo &resources) {
+CloudProvider *createAzureProvider(ResourceInfo &resources) {
   return new AzureProvider(resources);
 }
 

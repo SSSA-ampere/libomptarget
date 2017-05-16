@@ -33,7 +33,7 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Generic Provider:", __VA_ARGS__)
 
-GenericProvider *createGenericProvider(ResourceInfo &resources) {
+CloudProvider *createGenericProvider(ResourceInfo &resources) {
   return new GenericProvider(resources);
 }
 

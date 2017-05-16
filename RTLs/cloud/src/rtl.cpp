@@ -27,10 +27,13 @@
 
 #include "INIReader.h"
 #include "amazon.h"
-#include "cloud_compression.h"
-#include "generic.h"
 #include "azure.h"
+#include "generic.h"
+#include "local.h"
+#include "cloud_compression.h"
 #include "omptarget.h"
+
+#include "provider.h"
 
 #include "rtl.h"
 
@@ -45,7 +48,8 @@
 static std::vector<struct ProviderListEntry> ExistingProviderList = {
     {"Generic", createGenericProvider, "GenericProvider"},
     {"Azure", createAzureProvider, "AzureProvider"},
-    {"AWS", createAmazonProvider, "AmazonProvider"}};
+    {"AWS", createAmazonProvider, "AmazonProvider"},
+    {"Local", createLocalProvider, "LocalProvider"}};
 
 static std::vector<struct ProviderListEntry> ProviderList;
 
@@ -220,7 +224,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 
   SparkInfo spark{
       reader.Get("Spark", "HostName", ""),
-      (int)reader.GetInteger("Spark", "Port", DEFAULT_SPARK_PORT), mode,
+      (int)reader.GetInteger("Spark", "Port", DEFAULT_SPARK_PORT),
+      mode,
       reader.Get("Spark", "User", DEFAULT_SPARK_USER),
       reader.Get("Spark", "BinPath", ""),
       reader.Get("Spark", "Package", DEFAULT_SPARK_PACKAGE),

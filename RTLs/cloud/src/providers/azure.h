@@ -27,7 +27,7 @@ struct AzureInfo {
 
 const std::string DEFAULT_AZURE_CONTAINER = "ompcloud-container";
 
-GenericProvider *createAzureProvider(ResourceInfo &resources);
+CloudProvider *createAzureProvider(ResourceInfo &resources);
 
 class AzureProvider : public GenericProvider {
 private:

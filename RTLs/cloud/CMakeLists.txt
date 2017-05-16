@@ -47,6 +47,7 @@ if(HDFS_FOUND AND LIBSSH_FOUND AND ZLIB_FOUND)
         src/providers/amazon.cpp
         src/providers/azure.cpp
         src/providers/generic.cpp
+        src/providers/local.cpp
         src/util/cloud_ssh.cpp
         src/util/cloud_compression.cpp
         src/util/cloud_util.cpp

@@ -59,7 +59,10 @@ class CloudInfo(args: Array[String]) {
     case "HDFS" =>
       System.setProperty("HADOOP_USER_NAME", username)
     //sc.hadoopConfiguration.set("fs.defaultFS", uri)
+    case "FILE" =>
+    case "" =>
     case _ => throw new RuntimeException(filesystem + " is not a supported file system.")
+    
   }
 
   val sqlContext = new SQLContext(sc)

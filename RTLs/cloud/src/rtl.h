@@ -14,7 +14,7 @@
 #include "INIReader.h"
 #include "omptarget.h"
 
-class GenericProvider;
+class CloudProvider;
 
 /// Array of Dynamic libraries loaded for this target
 struct DynLibTy {
@@ -63,7 +63,7 @@ struct ResourceInfo {
 
 struct ProviderListEntry {
   std::string ProviderName;
-  GenericProvider *(*ProviderGenerator)(ResourceInfo &);
+  CloudProvider *(*ProviderGenerator)(ResourceInfo &);
   std::string SectionName;
 };
 
@@ -117,7 +117,7 @@ public:
   std::vector<SparkInfo> SparkClusters;
   ProxyInfo ProxyOptions;
   std::vector<hdfsFS> HdfsNodes;
-  std::vector<GenericProvider *> Providers;
+  std::vector<CloudProvider *> Providers;
   std::vector<std::string> AddressTables;
   std::vector<ElapsedTime> ElapsedTimes;
 
