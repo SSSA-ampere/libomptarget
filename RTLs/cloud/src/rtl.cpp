@@ -79,9 +79,7 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
   DP("Number of Devices: %d\n", NumberOfDevices);
 
   FuncGblEntries.resize(NumberOfDevices);
-  HdfsClusters.resize(NumberOfDevices);
   SparkClusters.resize(NumberOfDevices);
-  HdfsNodes.resize(NumberOfDevices);
   Providers.resize(NumberOfDevices);
   ElapsedTimes = std::vector<ElapsedTime>(NumberOfDevices);
   submitting_threads.resize(NumberOfDevices);
@@ -91,19 +89,6 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
     char *tmpname = strdup("/tmp/tmpfileXXXXXX");
     mkstemp(tmpname);
     AddressTables.push_back(std::string(tmpname));
-  }
-
-  // Parsing proxy configuration, if exists
-  if (reader.ParseError() < 0) {
-    DP("Couldn't find '%s'!\n", DEFAULT_OMPCLOUD_CONF_FILE);
-  } else {
-    ProxyInfo proxy{
-        reader.Get("Proxy", "HostName", DEFAULT_PROXY_HOSTNAME),
-        (int)reader.GetInteger("Proxy", "Port", DEFAULT_PROXY_PORT),
-        reader.Get("Proxy", "Type", DEFAULT_PROXY_TYPE),
-    };
-
-    ProxyOptions = proxy;
   }
 }
 
@@ -115,15 +100,6 @@ RTLDeviceInfoTy::~RTLDeviceInfoTy() {
     DP("Compression = %ds\n", timing.CompressionTime);
     DP("Decompression = %ds\n", timing.DecompressionTime);
     DP("Execution = %ds\n", timing.SparkExecutionTime);
-  }
-
-  // Disconnecting clouds
-  DP("Disconnecting HDFS server(s)\n");
-  for (int i = 0; i < HdfsNodes.size(); i++) {
-    int ret = hdfsDisconnect(HdfsNodes[i]);
-    if (ret != 0) {
-      DP("Error with HDFS server %d\n", i);
-    }
   }
 }
 
@@ -183,31 +159,6 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
     return OFFLOAD_FAIL;
   }
 
-  HdfsInfo hdfs{
-      reader.Get("HDFS", "HostName", ""),
-      (int)reader.GetInteger("HDFS", "Port", DEFAULT_HDFS_PORT),
-      reader.Get("HDFS", "User", ""),
-      reader.Get("HDFS", "WorkingDir", ""),
-      reader.GetBoolean("HDFS", "Compression", true),
-      reader.Get("HDFS", "CompressionFormat", DEFAULT_COMPRESSION_FORMAT),
-      1,
-  };
-
-  if (!hdfs.ServAddress.compare("") || !hdfs.UserName.compare("")) {
-    DP("Invalid values in 'cloud_rtl.ini' for HDFS!");
-    return OFFLOAD_FAIL;
-  }
-
-  DP("HDFS HostName: '%s' - Port: '%d' - User: '%s' - WorkingDir: '%s'\n",
-     hdfs.ServAddress.c_str(), hdfs.ServPort, hdfs.UserName.c_str(),
-     hdfs.WorkingDir.c_str());
-
-  // Checking if given WorkingDir ends in a slash for path concatenation.
-  // If it doesn't, add it
-  if (hdfs.WorkingDir.back() != '/') {
-    hdfs.WorkingDir += "/";
-  }
-
   // TODO: Check connection to Apache Spark cluster
 
   SparkMode mode;
@@ -232,8 +183,18 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       reader.Get("Spark", "JarPath", DEFAULT_SPARK_JARPATH),
       (int)reader.GetInteger("Spark", "PollInterval",
                              DEFAULT_SPARK_POLLINTERVAL),
-      reader.Get("Spark", "AdditionalArgs", ""),
+      reader.Get("Spark", "AdditionalArgs", ""),     
+      reader.Get("Spark", "WorkingDir", ""),
+      reader.GetBoolean("Spark", "Compression", true),
+      reader.Get("Spark", "CompressionFormat", DEFAULT_COMPRESSION_FORMAT),
+      1,
   };
+
+  // Checking if given WorkingDir ends in a slash for path concatenation.
+  // If it doesn't, add it
+  if (spark.WorkingDir.back() != '/') {
+    spark.WorkingDir += "/";
+  }
 
   if (spark.ServAddress.empty()) {
     // Look for env variable defining Spark hostname
@@ -251,13 +212,12 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
   DP("Spark HostName: '%s' - Port: '%d' - User: '%s' - Mode: %s\n",
      spark.ServAddress.c_str(), spark.ServPort, spark.UserName.c_str(),
      smode.c_str());
-  DP("Jar: %s - Class: %s\n", spark.JarPath.c_str(), spark.Package.c_str());
+  DP("Jar: %s - Class: %s - WorkingDir: '%s'\n", spark.JarPath.c_str(), spark.Package.c_str(), spark.WorkingDir.c_str());
 
-  DeviceInfo.HdfsClusters[device_id] = hdfs;
   DeviceInfo.SparkClusters[device_id] = spark;
 
   ResourceInfo resources{
-      hdfs, spark, DeviceInfo.ProxyOptions,
+      spark
   };
 
   // Checking for listed provider. Each device id refers to a provider position
@@ -439,7 +399,7 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
   ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
 
-  bool needCompression = DeviceInfo.HdfsClusters[device_id].Compression &&
+  bool needCompression = DeviceInfo.SparkClusters[device_id].Compression &&
                          size >= MIN_SIZE_COMPRESSION;
 
   // Since we now need the hdfs file, we create it here
@@ -499,7 +459,7 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 
   ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
 
-  bool needDecompression = DeviceInfo.HdfsClusters[device_id].Compression &&
+  bool needDecompression = DeviceInfo.SparkClusters[device_id].Compression &&
                            size >= MIN_SIZE_COMPRESSION;
 
   std::string filename = std::to_string(id);

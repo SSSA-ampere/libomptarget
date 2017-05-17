@@ -24,16 +24,6 @@ struct DynLibTy {
 
 extern const char *__progname; /* for job name */
 
-struct HdfsInfo {
-  std::string ServAddress;
-  int ServPort;
-  std::string UserName;
-  std::string WorkingDir;
-  bool Compression;
-  std::string CompressionFormat;
-  uintptr_t currAddr;
-};
-
 enum SparkMode { client, cluster, condor, invalid };
 
 struct SparkInfo {
@@ -46,19 +36,14 @@ struct SparkInfo {
   std::string JarPath;
   int PollInterval;
   std::string AdditionalArgs;
-};
-
-struct ProxyInfo {
-  std::string HostName;
-  int Port;
-  std::string Type;
+  std::string WorkingDir;
+  bool Compression;
+  std::string CompressionFormat;
+  uintptr_t currAddr;
 };
 
 struct ResourceInfo {
-  struct HdfsInfo HDFSInfo;
   struct SparkInfo Spark;
-  struct ProxyInfo Proxy;
-  hdfsFS FS;
 };
 
 struct ProviderListEntry {
@@ -88,9 +73,6 @@ struct ElapsedTime {
 #define DEFAULT_SPARK_PACKAGE "org.llvm.openmp.OmpKernel"
 #define DEFAULT_SPARK_JARPATH "target/scala-2.11/test-assembly-0.2.0.jar"
 #define DEFAULT_SPARK_POLLINTERVAL 300
-#define DEFAULT_PROXY_HOSTNAME ""
-#define DEFAULT_PROXY_PORT 0
-#define DEFAULT_PROXY_TYPE ""
 
 // Only data larger than about 1MB are compressed
 const int MIN_SIZE_COMPRESSION = 1000000;
@@ -113,10 +95,7 @@ class RTLDeviceInfoTy {
 public:
   int NumberOfDevices;
 
-  std::vector<HdfsInfo> HdfsClusters;
   std::vector<SparkInfo> SparkClusters;
-  ProxyInfo ProxyOptions;
-  std::vector<hdfsFS> HdfsNodes;
   std::vector<CloudProvider *> Providers;
   std::vector<std::string> AddressTables;
   std::vector<ElapsedTime> ElapsedTimes;

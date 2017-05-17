@@ -94,7 +94,7 @@ std::string AzureProvider::get_keys() {
 }
 
 std::string AzureProvider::get_cloud_path(std::string filename) {
-  std::string directory = hdfs.WorkingDir;
+  std::string directory = spark.WorkingDir;
   // Azure blob path should not start with a slash
   if (directory.substr(0, 1) == "/")
     directory = directory.substr(1);
@@ -209,22 +209,6 @@ int32_t AzureProvider::submit_job() {
   ssh_disconnect(aws_session);
   ssh_free(aws_session);
 
-  /*
-  std::ofstream out("/tmp/_ompcloud_script.sh");
-  out << spark.BinPath + "spark-submit --name '" + std::string(__progname) +
-             "' --master spark://" + spark.ServAddress + ":" +
-             std::to_string(spark.ServPort) + " " + spark.AdditionalArgs +
-             " --class " + spark.Package + " /tmp/spark_job.jar " +
-             get_job_args();
-  out.close();
-
-  std::string cmd2 = "ssh " + spark.UserName + "@" + spark.ServAddress +
-                    " 'bash -s' < /tmp/_ompcloud_script.sh";
-  execute_command(cmd2.c_str(), true);
-
-  remove("/tmp/_ompcloud_script.sh");
-  */
-
   return rc;
 }
 
@@ -234,11 +218,11 @@ std::string AzureProvider::get_job_args() {
   args += "HDFS";
   args += " wasb://" + ainfo.Container + "@" + ainfo.StorageAccount +
           ".blob.core.windows.net";
-  args += " " + hdfs.UserName;
-  args += " " + hdfs.WorkingDir;
+  args += " " + spark.UserName;
+  args += " " + spark.WorkingDir;
 
-  if (hdfs.Compression)
-    args += " " + hdfs.CompressionFormat;
+  if (spark.Compression)
+    args += " " + spark.CompressionFormat;
   else
     args += " false";
 

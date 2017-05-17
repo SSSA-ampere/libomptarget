@@ -20,13 +20,11 @@ const int BUFF_SIZE = 4096;
 
 class CloudProvider {
 protected:
-  HdfsInfo hdfs;
   SparkInfo spark;
   char *currAddr;
 
 public:
   CloudProvider(ResourceInfo &resources) {
-    hdfs = resources.HDFSInfo;
     spark = resources.Spark;
     currAddr = (char *)1;
   }

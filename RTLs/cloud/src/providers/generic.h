@@ -17,11 +17,18 @@
 #include "provider.h"
 #include "rtl.h"
 
+struct HdfsInfo {
+  std::string ServAddress;
+  int ServPort;
+  std::string UserName;
+};
+
 CloudProvider *createGenericProvider(ResourceInfo &resources);
 
 class GenericProvider : public CloudProvider  {
 protected:
   hdfsFS fs;
+  HdfsInfo hdfs;
 
   int32_t submit_cluster();
   int32_t submit_local();

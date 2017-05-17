@@ -18,9 +18,9 @@
 #include <hdfs.h>
 
 #include "INIReader.h"
-#include "omptarget.h"
 #include "cloud_ssh.h"
 #include "cloud_util.h"
+#include "omptarget.h"
 
 #include "generic.h"
 
@@ -38,6 +38,21 @@ CloudProvider *createGenericProvider(ResourceInfo &resources) {
 }
 
 int32_t GenericProvider::parse_config(INIReader reader) {
+
+  hdfs = {
+      reader.Get("HDFS", "HostName", ""),
+      (int)reader.GetInteger("HDFS", "Port", DEFAULT_HDFS_PORT),
+      reader.Get("HDFS", "User", ""),
+  };
+
+  if (!hdfs.ServAddress.compare("") || !hdfs.UserName.compare("")) {
+    DP("Invalid values in 'cloud_rtl.ini' for HDFS!");
+    return OFFLOAD_FAIL;
+  }
+
+  DP("HDFS HostName: '%s' - Port: '%d' - User: '%s'\n",
+     hdfs.ServAddress.c_str(), hdfs.ServPort, hdfs.UserName.c_str());
+
   return OFFLOAD_SUCCESS;
 }
 
@@ -59,8 +74,8 @@ int32_t GenericProvider::init_device() {
 
   hdfsFreeBuilder(builder);
 
-  if (hdfsExists(fs, hdfs.WorkingDir.c_str()) < 0) {
-    retval = hdfsCreateDirectory(fs, hdfs.WorkingDir.c_str());
+  if (hdfsExists(fs, spark.WorkingDir.c_str()) < 0) {
+    retval = hdfsCreateDirectory(fs, spark.WorkingDir.c_str());
     if (retval < 0) {
       DP("Cannot create directory\n");
       return OFFLOAD_FAIL;
@@ -72,7 +87,7 @@ int32_t GenericProvider::init_device() {
 
 int32_t GenericProvider::send_file(std::string filename,
                                    std::string tgtfilename) {
-  std::string final_name = hdfs.WorkingDir + std::string(tgtfilename);
+  std::string final_name = spark.WorkingDir + std::string(tgtfilename);
 
   DP("submitting file %s as %s\n", filename.c_str(), final_name.c_str());
 
@@ -131,7 +146,7 @@ int32_t GenericProvider::send_file(std::string filename,
 
 int32_t GenericProvider::get_file(std::string host_filename,
                                   std::string filename) {
-  filename = hdfs.WorkingDir + filename;
+  filename = spark.WorkingDir + filename;
 
   std::ofstream hostfile(host_filename);
   if (!hostfile.is_open()) {
@@ -377,10 +392,10 @@ std::string GenericProvider::get_job_args() {
   }
 
   args += " " + hdfs.UserName;
-  args += " " + hdfs.WorkingDir;
+  args += " " + spark.WorkingDir;
 
-  if (hdfs.Compression)
-    args += " " + hdfs.CompressionFormat;
+  if (spark.Compression)
+    args += " " + spark.CompressionFormat;
   else
     args += " false";
 

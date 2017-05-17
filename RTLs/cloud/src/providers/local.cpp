@@ -41,13 +41,13 @@ int32_t LocalProvider::parse_config(INIReader reader) {
 int32_t LocalProvider::init_device() {
   int retval;
   // Create the working folder
-  std::string cmd = "mkdir -p /tmp/" + hdfs.WorkingDir;
+  std::string cmd = "mkdir -p /tmp/" + spark.WorkingDir;
   system(cmd.c_str());
   return OFFLOAD_SUCCESS;
 }
 
 std::string LocalProvider::get_cloud_path(std::string filename) {
-  return "/tmp/" + hdfs.WorkingDir + filename;
+  return "/tmp/" + spark.WorkingDir + filename;
 }
 
 int32_t LocalProvider::send_file(std::string filename,
@@ -97,11 +97,11 @@ std::string LocalProvider::get_job_args() {
 
   args += "FILE";
   args += " file:///";
-  args += " " + hdfs.UserName;
-  args += " /tmp/" + hdfs.WorkingDir;
+  args += " " + spark.UserName;
+  args += " /tmp/" + spark.WorkingDir;
 
-  if (hdfs.Compression)
-    args += " " + hdfs.CompressionFormat;
+  if (spark.Compression)
+    args += " " + spark.CompressionFormat;
   else
     args += " false";
 

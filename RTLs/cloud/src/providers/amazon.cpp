@@ -74,12 +74,12 @@ int32_t AmazonProvider::parse_config(INIReader reader) {
 int32_t AmazonProvider::init_device() { return OFFLOAD_SUCCESS; }
 
 std::string AmazonProvider::get_keys() {
-  return "--access_key=" + ainfo.AccessKey + " --secret_key=" +
-         ainfo.SecretKey + " " + ainfo.AdditionalArgs;
+  return "--access_key=" + ainfo.AccessKey +
+         " --secret_key=" + ainfo.SecretKey + " " + ainfo.AdditionalArgs;
 }
 
 std::string AmazonProvider::get_cloud_path(std::string filename) {
-  return "s3://" + ainfo.Bucket + hdfs.WorkingDir + filename;
+  return "s3://" + ainfo.Bucket + spark.WorkingDir + filename;
 }
 
 int32_t AmazonProvider::send_file(std::string filename,
@@ -189,24 +189,6 @@ int32_t AmazonProvider::submit_job() {
   ssh_disconnect(aws_session);
   ssh_free(aws_session);
 
-  /*
-  std::ofstream out("/tmp/_ompcloud_script.sh");
-  out << "export AWS_ACCESS_KEY_ID=" + ainfo.AccessKey + "\n";
-  out << "export AWS_SECRET_ACCESS_KEY=" + ainfo.SecretKey + "\n";
-  out << "spark-submit --name '" + std::string(__progname) +
-             "' --master spark://" + spark.ServAddress + ":" +
-             std::to_string(spark.ServPort) + " " + spark.AdditionalArgs +
-             " --class " + spark.Package + " /tmp/spark_job.jar " +
-             get_job_args() + " " + ainfo.AccessKey + " " + ainfo.SecretKey;
-  out.close();
-
-  std::string cmd = "ssh " + spark.UserName + "@" + spark.ServAddress +
-                    " 'bash -s' < /tmp/_ompcloud_script.sh";
-  execute_command(cmd.c_str(), true);
-
-  remove("/tmp/_ompcloud_script.sh");
-  */
-
   return rc;
 }
 
@@ -215,11 +197,11 @@ std::string AmazonProvider::get_job_args() {
 
   args += "S3";
   args += " s3a://" + ainfo.Bucket;
-  args += " " + hdfs.UserName;
-  args += " " + hdfs.WorkingDir;
+  args += " " + spark.UserName;
+  args += " " + spark.WorkingDir;
 
-  if (hdfs.Compression)
-    args += " " + hdfs.CompressionFormat;
+  if (spark.Compression)
+    args += " " + spark.CompressionFormat;
   else
     args += " false";
 
