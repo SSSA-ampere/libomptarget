@@ -58,15 +58,6 @@ int32_t LocalProvider::send_file(std::string filename,
   return OFFLOAD_SUCCESS;
 }
 
-void *LocalProvider::data_alloc(int64_t size, int32_t type, int32_t id) {
-  // NOTE: we do not create the HDFS file here because we do not want to
-  // waste time creating stuff that we might not need before (there may be
-  // unecessary allocations)
-
-  // Return fake target address
-  return (void *)currAddr++;
-}
-
 int32_t LocalProvider::get_file(std::string host_filename,
                                 std::string filename) {
   std::ifstream src(get_cloud_path(filename), std::ios::binary);
