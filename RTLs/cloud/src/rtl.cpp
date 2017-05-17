@@ -47,7 +47,7 @@
 
 static std::vector<struct ProviderListEntry> ExistingProviderList = {
     {"Local", createLocalProvider, "LocalProvider"},
-    {"Generic", createGenericProvider, "GenericProvider"},
+    {"Generic", createGenericProvider, "HdfsProvider"},
     {"Azure", createAzureProvider, "AzureProvider"},
     {"AWS", createAmazonProvider, "AmazonProvider"}};
 

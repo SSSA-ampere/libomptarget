@@ -39,19 +39,19 @@ CloudProvider *createGenericProvider(ResourceInfo &resources) {
 
 int32_t GenericProvider::parse_config(INIReader reader) {
 
-  hdfs = {
-      reader.Get("HDFS", "HostName", ""),
-      (int)reader.GetInteger("HDFS", "Port", DEFAULT_HDFS_PORT),
-      reader.Get("HDFS", "User", ""),
+  hinfo = {
+      reader.Get("HdfsProvider", "HostName", ""),
+      (int)reader.GetInteger("HdfsProvider", "Port", DEFAULT_HDFS_PORT),
+      reader.Get("HdfsProvider", "User", ""),
   };
 
-  if (!hdfs.ServAddress.compare("") || !hdfs.UserName.compare("")) {
+  if (!hinfo.ServAddress.compare("") || !hinfo.UserName.compare("")) {
     DP("Invalid values in 'cloud_rtl.ini' for HDFS!");
     return OFFLOAD_FAIL;
   }
 
   DP("HDFS HostName: '%s' - Port: '%d' - User: '%s'\n",
-     hdfs.ServAddress.c_str(), hdfs.ServPort, hdfs.UserName.c_str());
+     hinfo.ServAddress.c_str(), hinfo.ServPort, hinfo.UserName.c_str());
 
   return OFFLOAD_SUCCESS;
 }
@@ -61,9 +61,9 @@ int32_t GenericProvider::init_device() {
 
   // Init connection to HDFS cluster
   struct hdfsBuilder *builder = hdfsNewBuilder();
-  hdfsBuilderSetNameNode(builder, hdfs.ServAddress.c_str());
-  hdfsBuilderSetNameNodePort(builder, hdfs.ServPort);
-  hdfsBuilderSetUserName(builder, hdfs.UserName.c_str());
+  hdfsBuilderSetNameNode(builder, hinfo.ServAddress.c_str());
+  hdfsBuilderSetNameNodePort(builder, hinfo.ServPort);
+  hdfsBuilderSetUserName(builder, hinfo.UserName.c_str());
   fs = hdfsBuilderConnect(builder);
 
   if (fs == NULL) {
@@ -370,7 +370,7 @@ int32_t GenericProvider::submit_local() {
 std::string GenericProvider::get_job_args() {
   std::string args = "";
 
-  if (hdfs.ServAddress.find("s3") != std::string::npos) {
+  if (hinfo.ServAddress.find("s3") != std::string::npos) {
     args += "S3";
   } else {
     args += "HDFS";
@@ -378,20 +378,20 @@ std::string GenericProvider::get_job_args() {
 
   args += " ";
 
-  if (hdfs.ServAddress.find("://") == std::string::npos) {
+  if (hinfo.ServAddress.find("://") == std::string::npos) {
     args += "hdfs://";
   }
-  args += hdfs.ServAddress;
+  args += hinfo.ServAddress;
 
-  if (hdfs.ServAddress.back() == '/') {
+  if (hinfo.ServAddress.back() == '/') {
     args.erase(args.end() - 1);
   }
 
-  if (hdfs.ServAddress.find("hdfs") != std::string::npos) {
-    args += ":" + std::to_string(hdfs.ServPort);
+  if (hinfo.ServAddress.find("hdfs") != std::string::npos) {
+    args += ":" + std::to_string(hinfo.ServPort);
   }
 
-  args += " " + hdfs.UserName;
+  args += " " + hinfo.UserName;
   args += " " + spark.WorkingDir;
 
   if (spark.Compression)
