@@ -28,9 +28,9 @@
 #include "INIReader.h"
 #include "amazon.h"
 #include "azure.h"
+#include "cloud_compression.h"
 #include "generic.h"
 #include "local.h"
-#include "cloud_compression.h"
 #include "omptarget.h"
 
 #include "provider.h"
@@ -46,10 +46,10 @@
 #define DP(...) DEBUGP("Target " GETNAME2(TARGET_NAME) " RTL", __VA_ARGS__)
 
 static std::vector<struct ProviderListEntry> ExistingProviderList = {
+    {"Local", createLocalProvider, "LocalProvider"},
     {"Generic", createGenericProvider, "GenericProvider"},
     {"Azure", createAzureProvider, "AzureProvider"},
-    {"AWS", createAmazonProvider, "AmazonProvider"},
-    {"Local", createLocalProvider, "LocalProvider"}};
+    {"AWS", createAmazonProvider, "AmazonProvider"}};
 
 static std::vector<struct ProviderListEntry> ProviderList;
 
@@ -74,6 +74,13 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
       ProviderList.push_back(entry);
       NumberOfDevices++;
     }
+  }
+
+  if (ProviderList.size() == 0) {
+    DP("No specific provider detected in configuration file.\n");
+    DP("Local provider will be used.\n");
+    ProviderList.push_back(ExistingProviderList.front());
+    NumberOfDevices++;
   }
 
   DP("Number of Devices: %d\n", NumberOfDevices);
@@ -183,7 +190,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       reader.Get("Spark", "JarPath", DEFAULT_SPARK_JARPATH),
       (int)reader.GetInteger("Spark", "PollInterval",
                              DEFAULT_SPARK_POLLINTERVAL),
-      reader.Get("Spark", "AdditionalArgs", ""),     
+      reader.Get("Spark", "AdditionalArgs", ""),
       reader.Get("Spark", "WorkingDir", ""),
       reader.GetBoolean("Spark", "Compression", true),
       reader.Get("Spark", "CompressionFormat", DEFAULT_COMPRESSION_FORMAT),
@@ -212,13 +219,12 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
   DP("Spark HostName: '%s' - Port: '%d' - User: '%s' - Mode: %s\n",
      spark.ServAddress.c_str(), spark.ServPort, spark.UserName.c_str(),
      smode.c_str());
-  DP("Jar: %s - Class: %s - WorkingDir: '%s'\n", spark.JarPath.c_str(), spark.Package.c_str(), spark.WorkingDir.c_str());
+  DP("Jar: %s - Class: %s - WorkingDir: '%s'\n", spark.JarPath.c_str(),
+     spark.Package.c_str(), spark.WorkingDir.c_str());
 
   DeviceInfo.SparkClusters[device_id] = spark;
 
-  ResourceInfo resources{
-      spark
-  };
+  ResourceInfo resources{spark};
 
   // Checking for listed provider. Each device id refers to a provider position
   // in the list
