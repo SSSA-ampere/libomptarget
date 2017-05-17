@@ -29,12 +29,12 @@ const std::string DEFAULT_AZURE_CONTAINER = "ompcloud-container";
 
 CloudProvider *createAzureProvider(ResourceInfo &resources);
 
-class AzureProvider : public GenericProvider {
+class AzureProvider : public CloudProvider {
 private:
   AzureInfo ainfo;
 
 public:
-  AzureProvider(ResourceInfo resources) : GenericProvider(resources) {}
+  AzureProvider(ResourceInfo resources) : CloudProvider(resources) {}
 
   std::string get_keys();
   std::string get_cloud_path(std::string filename);
