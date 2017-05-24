@@ -15,7 +15,6 @@
 #define _INCLUDE_GENERIC_H_
 
 #include "provider.h"
-#include "rtl.h"
 
 struct HdfsInfo {
   std::string ServAddress;
@@ -25,9 +24,9 @@ struct HdfsInfo {
 
 CloudProvider *createGenericProvider(ResourceInfo &resources);
 
-class GenericProvider : public CloudProvider  {
+class GenericProvider : public CloudProvider {
 protected:
-  hdfsFS fs;
+  void* fs;
   HdfsInfo hinfo;
 
   int32_t submit_cluster();

@@ -14,8 +14,7 @@
 #ifndef _INCLUDE_AZURE_H_
 #define _INCLUDE_AZURE_H_
 
-#include "generic.h"
-#include "rtl.h"
+#include "provider.h"
 
 struct AzureInfo {
   std::string Cluster;

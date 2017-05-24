@@ -14,8 +14,7 @@
 #ifndef _INCLUDE_AMAZON_H_
 #define _INCLUDE_AMAZON_H_
 
-#include "generic.h"
-#include "rtl.h"
+#include "provider.h"
 
 struct AmazonInfo {
   std::string Bucket;

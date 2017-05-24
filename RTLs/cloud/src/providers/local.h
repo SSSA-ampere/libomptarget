@@ -15,7 +15,6 @@
 #define _INCLUDE_LOCAL_H_
 
 #include "provider.h"
-#include "rtl.h"
 
 CloudProvider *createLocalProvider(ResourceInfo &resources);
 

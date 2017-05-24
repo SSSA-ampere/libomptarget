@@ -2,13 +2,12 @@
 #define _INCLUDE_RTL_H
 
 #include <assert.h>
+#include <cstdio>
+#include <cstdlib>
 #include <fstream>
-#include <hdfs.h>
 #include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <thread>
 #include <mutex>
+#include <thread>
 #include <vector>
 
 #include "INIReader.h"

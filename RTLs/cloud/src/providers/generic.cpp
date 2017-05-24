@@ -74,8 +74,8 @@ int32_t GenericProvider::init_device() {
 
   hdfsFreeBuilder(builder);
 
-  if (hdfsExists(fs, spark.WorkingDir.c_str()) < 0) {
-    retval = hdfsCreateDirectory(fs, spark.WorkingDir.c_str());
+  if (hdfsExists((hdfsFS)fs, spark.WorkingDir.c_str()) < 0) {
+    retval = hdfsCreateDirectory((hdfsFS)fs, spark.WorkingDir.c_str());
     if (retval < 0) {
       DP("Cannot create directory\n");
       return OFFLOAD_FAIL;
@@ -92,7 +92,7 @@ int32_t GenericProvider::send_file(std::string filename,
   DP("submitting file %s as %s\n", filename.c_str(), final_name.c_str());
 
   hdfsFile file =
-      hdfsOpenFile(fs, final_name.c_str(), O_WRONLY, BUFF_SIZE, 0, 0);
+      hdfsOpenFile((hdfsFS)fs, final_name.c_str(), O_WRONLY, BUFF_SIZE, 0, 0);
 
   if (file == NULL) {
     DP("Opening file in HDFS failed.\n");
@@ -103,7 +103,7 @@ int32_t GenericProvider::send_file(std::string filename,
 
   if (!hstfile.is_open()) {
     DP("Opening host file %s failed.", filename.c_str());
-    hdfsCloseFile(fs, file);
+    hdfsCloseFile((hdfsFS)fs, file);
     return OFFLOAD_FAIL;
   }
 
@@ -119,11 +119,11 @@ int32_t GenericProvider::send_file(std::string filename,
       }
     }
 
-    retval = hdfsWrite(fs, file, buffer, hstfile.gcount());
+    retval = hdfsWrite((hdfsFS)fs, file, buffer, hstfile.gcount());
 
     if (retval < 0) {
       DP("Writing on HDFS failed.\n");
-      hdfsCloseFile(fs, file);
+      hdfsCloseFile((hdfsFS)fs, file);
       return OFFLOAD_FAIL;
     }
 
@@ -134,7 +134,7 @@ int32_t GenericProvider::send_file(std::string filename,
 
   hstfile.close();
 
-  retval = hdfsCloseFile(fs, file);
+  retval = hdfsCloseFile((hdfsFS)fs, file);
 
   if (retval < 0) {
     DP("Closing on HDFS failed.\n");
@@ -154,16 +154,16 @@ int32_t GenericProvider::get_file(std::string host_filename,
     exit(OFFLOAD_FAIL);
   }
 
-  int retval = hdfsExists(fs, filename.c_str());
+  int retval = hdfsExists((hdfsFS)fs, filename.c_str());
   if (retval < 0) {
     DP("File does not exist\n");
     return OFFLOAD_FAIL;
   }
 
-  hdfsFileInfo *fileInfo = hdfsGetPathInfo(fs, filename.c_str());
+  hdfsFileInfo *fileInfo = hdfsGetPathInfo((hdfsFS)fs, filename.c_str());
   int size = fileInfo->mSize;
 
-  hdfsFile file = hdfsOpenFile(fs, filename.c_str(), O_RDONLY, 0, 0, 0);
+  hdfsFile file = hdfsOpenFile((hdfsFS)fs, filename.c_str(), O_RDONLY, 0, 0, 0);
   if (file == NULL) {
     DP("Opening failed.\n");
     return OFFLOAD_FAIL;
@@ -174,7 +174,7 @@ int32_t GenericProvider::get_file(std::string host_filename,
   int current_pos = 0;
 
   do {
-    retval = hdfsRead(fs, file, (void *)buffer, BUFF_SIZE);
+    retval = hdfsRead((hdfsFS)fs, file, (void *)buffer, BUFF_SIZE);
     if (retval < 0) {
       DP("Reading failed.\n");
       return OFFLOAD_FAIL;
@@ -187,7 +187,7 @@ int32_t GenericProvider::get_file(std::string host_filename,
     hostfile.write(buffer, BUFF_SIZE);
   } while (current_pos != size);
 
-  retval = hdfsCloseFile(fs, file);
+  retval = hdfsCloseFile((hdfsFS)fs, file);
   if (retval < 0) {
     DP("Closing failed.\n");
     return OFFLOAD_FAIL;
@@ -201,7 +201,7 @@ int32_t GenericProvider::get_file(std::string host_filename,
 int32_t GenericProvider::delete_file(std::string filename) {
   DP("Deleting file '%s'\n", filename.c_str());
 
-  int retval = hdfsDelete(fs, filename.c_str(), 0);
+  int retval = hdfsDelete((hdfsFS)fs, filename.c_str(), 0);
   if (retval < 0) {
     DP("Deleting file failed.\n");
     return OFFLOAD_FAIL;

@@ -15,8 +15,6 @@
 #include <cstdlib>
 #include <string>
 
-#include <hdfs.h>
-
 #include "INIReader.h"
 #include "cloud_ssh.h"
 #include "cloud_util.h"
