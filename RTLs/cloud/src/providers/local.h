@@ -25,6 +25,7 @@ protected:
 
 public:
   LocalProvider(ResourceInfo resources) : CloudProvider(resources) {}
+  ~LocalProvider();
 
   std::string get_cloud_path(std::string filename);
 

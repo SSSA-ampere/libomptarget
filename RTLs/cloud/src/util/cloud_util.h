@@ -18,4 +18,8 @@ std::string exec_cmd(const char* cmd);
 
 int32_t execute_command(const char *command, bool print_result);
 
+std::string random_string( size_t length );
+
+int remove_directory(const char *path);
+
 #endif

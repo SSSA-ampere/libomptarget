@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <thread>
+#include <unistd.h>
 
 #include <dlfcn.h>
 #include <gelf.h>
@@ -28,6 +29,7 @@
 #include "amazon.h"
 #include "azure.h"
 #include "cloud_compression.h"
+#include "cloud_util.h"
 #include "generic.h"
 #include "local.h"
 #include "omptarget.h"
@@ -53,6 +55,8 @@ static std::vector<struct ProviderListEntry> ExistingProviderList = {
 static std::vector<struct ProviderListEntry> ProviderList;
 
 static RTLDeviceInfoTy DeviceInfo;
+
+static std::string working_path;
 
 RTLDeviceInfoTy::RTLDeviceInfoTy() {
 
@@ -91,8 +95,18 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
   submitting_threads.resize(NumberOfDevices);
   retrieving_threads.resize(NumberOfDevices);
 
+  char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
+  char *tempdir = mkdtemp(tempdir_template);
+  if (tempdir == NULL) {
+    perror("mkdtemp");
+    exit(EXIT_FAILURE);
+  }
+  working_path = tempdir;
+  std::string cmd("mkdir -p " + working_path);
+  exec_cmd(cmd.c_str());
+
   for (int i = 0; i < NumberOfDevices; i++) {
-    char *tmpname = strdup("/tmp/tmpfileXXXXXX");
+    char *tmpname = strdup((working_path + "/tmpfileXXXXXX").c_str());
     mkstemp(tmpname);
     AddressTables.push_back(std::string(tmpname));
   }
@@ -107,6 +121,7 @@ RTLDeviceInfoTy::~RTLDeviceInfoTy() {
     DP("Decompression = %ds\n", timing.DecompressionTime);
     DP("Execution = %ds\n", timing.SparkExecutionTime);
   }
+  remove_directory(working_path.c_str());
 }
 
 void RTLDeviceInfoTy::createOffloadTable(int32_t device_id,
@@ -200,6 +215,10 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
   // If it doesn't, add it
   if (spark.WorkingDir.back() != '/') {
     spark.WorkingDir += "/";
+  }
+
+  if (spark.WorkingDir.empty()) {
+    spark.WorkingDir = "ompcloud." + random_string(8);
   }
 
   if (spark.ServAddress.empty()) {
@@ -304,7 +323,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   //
   // 1) Create tmp file with the library contents
   // 2) Use dlopen to load the file and dlsym to retrieve the symbols
-  char tmp_name[] = "/tmp/tmpfile_XXXXXX";
+  char *tmp_name = strdup((working_path + "/tmpfileXXXXXX").c_str());
   int tmp_fd = mkstemp(tmp_name);
 
   if (tmp_fd == -1) {
@@ -409,7 +428,7 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
   // Since we now need the hdfs file, we create it here
   std::string filename = std::to_string(id);
-  std::string host_filepath = "/tmp/" + filename;
+  std::string host_filepath = working_path + filename;
 
   int64_t sendingSize;
   if (needCompression) {
@@ -468,7 +487,7 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                            size >= MIN_SIZE_COMPRESSION;
 
   std::string filename = std::to_string(id);
-  std::string host_filepath = "/tmp/" + filename;
+  std::string host_filepath = working_path + filename;
 
   auto t_start = std::chrono::high_resolution_clock::now();
   DeviceInfo.Providers[device_id]->get_file(host_filepath, filename);
