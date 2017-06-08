@@ -12,6 +12,8 @@ import org.apache.spark.SparkFiles
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.SparkSession
 
+import com.google.common.io.Files
+
 object NativeKernels {
 
   val LibraryName = "libmr.so"
@@ -69,7 +71,8 @@ class CloudInfo(args: Array[String]) {
 
   val fs = FileSystem.get(URI.create(uri), sc.hadoopConfiguration)
 
-  val localLibrary = new File("/tmp/", NativeKernels.LibraryName)
+  val myTempDir = Files.createTempDir()
+  val localLibrary = new File(myTempDir, NativeKernels.LibraryName)
 
   FileUtil.copy(fs, new Path(uri + path + NativeKernels.LibraryName), localLibrary, false, fsConf)
 
