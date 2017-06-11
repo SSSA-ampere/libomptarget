@@ -46,7 +46,7 @@ int32_t execute_command(const char *command, bool print_result) {
   // fprintf(stdout, "Running: %s\n", command);
 
   if (fp == NULL) {
-    fprintf(stderr, "Failed to execute command.\n");
+    fprintf(stderr, "ERROR: Failed to execute command\n");
     return EXIT_FAILURE;
   }
 

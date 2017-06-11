@@ -49,8 +49,8 @@ int32_t LocalProvider::init_device() {
   char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
   char *tempdir = mkdtemp(tempdir_template);
   if (tempdir == NULL) {
-    perror("mkdtemp");
-    exit(EXIT_FAILURE);
+    perror("ERROR: generating temp folder name\n");
+    exit(OFFLOAD_FAIL);
   }
   working_path = tempdir;
   std::string cmd("mkdir -p " + working_path + "/" + spark.WorkingDir);

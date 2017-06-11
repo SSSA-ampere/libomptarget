@@ -39,7 +39,7 @@ CloudProvider *createAzureProvider(ResourceInfo &resources) {
 int32_t AzureProvider::parse_config(INIReader reader) {
   ainfo.Container = reader.Get("AzureProvider", "Container", "");
   if (ainfo.Container.empty()) {
-    DP("Did not find Azure container name, use default.\n");
+    DP("Warning: Did not find Azure container name, use default.\n");
     ainfo.Container = DEFAULT_AZURE_CONTAINER;
   }
 
@@ -49,7 +49,7 @@ int32_t AzureProvider::parse_config(INIReader reader) {
       ainfo.StorageAccount = std::string(envSecretKey);
     }
     if (ainfo.StorageAccount.empty()) {
-      DP("Did not find Azure Storage Account.\n");
+      DP("ERROR: Did not find Azure Storage Account.\n");
       exit(OFFLOAD_FAIL);
     }
   }
@@ -60,12 +60,16 @@ int32_t AzureProvider::parse_config(INIReader reader) {
       ainfo.AccessKey = std::string(envAccessKey);
     }
     if (ainfo.AccessKey.empty()) {
-      DP("Did not find Azure Storage Access Key.\n");
+      DP("ERROR: Did not find Azure Storage Access Key.\n");
       exit(OFFLOAD_FAIL);
     }
   }
 
   ainfo.Cluster = reader.Get("AzureProvider", "Cluster", "");
+  if (ainfo.Cluster.empty()) {
+    DP("ERROR: Did not find Azure cluster name.\n");
+    exit(OFFLOAD_FAIL);
+  }
 
   // FIXME: not used anymore ?
   ainfo.AdditionalArgs = reader.Get("AzureProvider", "AdditionalArgs", "");
@@ -81,7 +85,7 @@ int32_t AzureProvider::init_device() {
 
   if (execute_command(command.c_str(), true)) {
     DP("azure-cli failed: %s\n", command.c_str());
-    return OFFLOAD_FAIL;
+    exit(OFFLOAD_FAIL);
   }
   return OFFLOAD_SUCCESS;
 }
@@ -109,7 +113,7 @@ int32_t AzureProvider::send_file(std::string filename,
 
   if (execute_command(command.c_str(), true)) {
     DP("azure-cli failed: %s\n", command.c_str());
-    return OFFLOAD_FAIL;
+    exit(OFFLOAD_FAIL);
   }
 
   return OFFLOAD_SUCCESS;
@@ -126,7 +130,7 @@ int32_t AzureProvider::get_file(std::string host_filename,
 
   if (execute_command(command.c_str(), true)) {
     DP("azure-cli failed: %s\n", command.c_str());
-    return OFFLOAD_FAIL;
+    exit(OFFLOAD_FAIL);
   }
 
   return OFFLOAD_SUCCESS;
@@ -139,7 +143,7 @@ int32_t AzureProvider::delete_file(std::string filename) {
   command += " " + get_keys();
 
   if (execute_command(command.c_str(), true)) {
-    return OFFLOAD_FAIL;
+    exit(OFFLOAD_FAIL);
   }
 
   return OFFLOAD_SUCCESS;
@@ -153,8 +157,10 @@ int32_t AzureProvider::submit_job() {
   int verbosity = SSH_LOG_NOLOG;
   int port = 22;
 
-  if (aws_session == NULL)
-    exit(-1);
+  if (aws_session == NULL) {
+    DP("ERROR: Cannot create ssh session\n")
+    exit(OFFLOAD_FAIL);
+  }
 
   std::string ssh_server = ainfo.Cluster + "-ssh.azurehdinsight.net";
 
@@ -165,16 +171,18 @@ int32_t AzureProvider::submit_job() {
 
   rc = ssh_connect(aws_session);
   if (rc != SSH_OK) {
-    fprintf(stderr, "Error connecting to server: %s\n",
+    fprintf(stderr, "ERROR: cannot connect to server: %s\n",
             ssh_get_error(aws_session));
     exit(OFFLOAD_FAIL);
   }
 
   // Verify the server's identity
-  if (ssh_verify_knownhost(aws_session) < 0) {
+  if (ssh_verify_knownhost(aws_session) != SSH_OK) {
+    fprintf(stderr, "ERROR: the server identity is not known: %s\n",
+            ssh_get_error(aws_session));
     ssh_disconnect(aws_session);
     ssh_free(aws_session);
-    return OFFLOAD_FAIL;
+    exit(OFFLOAD_FAIL);
   }
 
   rc = ssh_userauth_publickey_auto(aws_session, spark.UserName.c_str(), NULL);
@@ -186,23 +194,36 @@ int32_t AzureProvider::submit_job() {
     rc = ssh_userauth_publickey(aws_session, spark.UserName.c_str(), pkey);
 
     if (rc == SSH_AUTH_ERROR) {
-      fprintf(stderr, "SSH authentication failed: %s\n",
+      fprintf(stderr, "ERROR: SSH authentication failed: %s\n",
               ssh_get_error(aws_session));
-      return (OFFLOAD_FAIL);
+      exit(OFFLOAD_FAIL);
     }
   }
 
   // Copy jar file
-  DP("Send Spark jar file\n");
-  ssh_copy(aws_session, spark.JarPath.c_str(), "/tmp/", "spark_job.jar");
+  DP("Send Spark JAR file to the cluster driver\n");
+  std::string JarFileName = "SparkJob-OmpCloud-" + random_string(8) + ".jar";
+
+  rc = ssh_copy(aws_session, spark.JarPath.c_str(), "/tmp/",
+                JarFileName.c_str());
+  if (rc != SSH_OK) {
+    fprintf(stderr, "ERROR: Copy of the JAR file failed: %s\n",
+            ssh_get_error(aws_session));
+    exit(OFFLOAD_FAIL);
+  }
 
   // Run Spark
   std::string cmd = spark.BinPath + "spark-submit --name " + "\"" + __progname +
                     "\"" + " --master yarn-cluster --deploy-mode cluster " +
                     spark.AdditionalArgs + " --class " + spark.Package +
-                    " /tmp/spark_job.jar " + get_job_args();
+                    " /tmp/" + JarFileName + " " + get_job_args();
 
   rc = ssh_run(aws_session, cmd.c_str());
+  if (rc != SSH_OK) {
+    fprintf(stderr, "ERROR: Spark job execution through SSH failed %s\n",
+            ssh_get_error(aws_session));
+    exit(OFFLOAD_FAIL);
+  }
 
   ssh_disconnect(aws_session);
   ssh_free(aws_session);

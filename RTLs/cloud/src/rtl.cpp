@@ -65,6 +65,16 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
     conf_filename = DEFAULT_OMPCLOUD_CONF_FILE;
   }
 
+  char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
+  char *tempdir = mkdtemp(tempdir_template);
+  if (tempdir == NULL) {
+    DP("Error on mkdtemp\n");
+    exit(EXIT_FAILURE);
+  }
+  working_path = tempdir;
+  std::string cmd("mkdir -p " + working_path);
+  DP("%s\n", exec_cmd(cmd.c_str()).c_str());
+
   INIReader reader(conf_filename);
 
   NumberOfDevices = 0;
@@ -95,19 +105,18 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
   submitting_threads.resize(NumberOfDevices);
   retrieving_threads.resize(NumberOfDevices);
 
-  char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
-  char *tempdir = mkdtemp(tempdir_template);
-  if (tempdir == NULL) {
-    perror("mkdtemp");
-    exit(EXIT_FAILURE);
-  }
-  working_path = tempdir;
-  std::string cmd("mkdir -p " + working_path);
-  exec_cmd(cmd.c_str());
-
   for (int i = 0; i < NumberOfDevices; i++) {
     char *tmpname = strdup((working_path + "/tmpfileXXXXXX").c_str());
-    mkstemp(tmpname);
+    if (tmpname == NULL) {
+      DP("Error: problem on strdup\n");
+      DP("Working path = %s\n", working_path.c_str());
+      exit(OFFLOAD_FAIL);
+    }
+    int ret = mkstemp(tmpname);
+    if (ret < 0) {
+      DP("Error when making %s\n", tmpname);
+      exit(OFFLOAD_FAIL);
+    }
     AddressTables.push_back(std::string(tmpname));
   }
 }
@@ -171,13 +180,14 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
   if (conf_filename == NULL) {
     conf_filename = DEFAULT_OMPCLOUD_CONF_FILE;
   }
+  DP("Used OmpCloud configuration file: %s\n", conf_filename);
 
   // Parsing configurations
   INIReader reader(conf_filename);
 
   if (reader.ParseError() < 0) {
-    DP("Couldn't find '%s'!", conf_filename);
-    return OFFLOAD_FAIL;
+    DP("ERROR: Couldn't find the given configuration '%s'!", conf_filename);
+    exit(OFFLOAD_FAIL);
   }
 
   // TODO: Check connection to Apache Spark cluster
@@ -230,8 +240,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 
   if (spark.Mode == SparkMode::invalid || !spark.Package.compare("") ||
       !spark.JarPath.compare("")) {
-    DP("Invalid values in 'cloud_rtl.ini' for Spark!");
-    return OFFLOAD_FAIL;
+    DP("ERROR: Invalid values in 'cloud_rtl.ini' for Spark!");
+    exit(OFFLOAD_FAIL);
   }
 
   DP("Spark HostName: '%s' - Port: '%d' - User: '%s' - Mode: %s\n",
@@ -259,6 +269,17 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 
 __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
                                           __tgt_device_image *image) {
+
+  char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
+  char *tempdir = mkdtemp(tempdir_template);
+  if (tempdir == NULL) {
+    DP("ERROR: Error on mkdtemp\n");
+    exit(EXIT_FAILURE);
+  }
+  working_path = tempdir;
+  std::string cmd("mkdir -p " + working_path);
+  DP("%s\n", exec_cmd(cmd.c_str()).c_str());
+
   DP("Dev %d: load binary from 0x%llx image\n", device_id,
      (long long)image->ImageStart);
 
@@ -275,12 +296,12 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   // Obtain elf handler
   Elf *e = elf_memory((char *)image->ImageStart, ImageSize);
   if (!e) {
-    DP("Unable to get ELF handle: %s!\n", elf_errmsg(-1));
+    DP("ERROR: Unable to get ELF handle: %s!\n", elf_errmsg(-1));
     return NULL;
   }
 
   if (elf_kind(e) != ELF_K_ELF) {
-    DP("Invalid Elf kind!\n");
+    DP("ERROR: Invalid Elf kind!\n");
     elf_end(e);
     return NULL;
   }
@@ -292,7 +313,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   size_t shstrndx;
 
   if (elf_getshdrstrndx(e, &shstrndx)) {
-    DP("Unable to get ELF strings index!\n");
+    DP("ERROR: Unable to get ELF strings index!\n");
     elf_end(e);
     return NULL;
   }
@@ -310,9 +331,9 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   }
 
   if (!entries_offset) {
-    DP("Entries Section Offset Not Found\n");
+    DP("ERROR: Entries Section Offset Not Found\n");
     elf_end(e);
-    return NULL;
+    exit(OFFLOAD_FAIL);
   }
 
   DP("Offset of entries section is (%016lx).\n", entries_offset);
@@ -323,25 +344,25 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   //
   // 1) Create tmp file with the library contents
   // 2) Use dlopen to load the file and dlsym to retrieve the symbols
-  char *tmp_name = strdup((working_path + "/tmpfileXXXXXX").c_str());
+  char *tmp_name = strdup("/tmp/tmpfileXXXXXX");
   int tmp_fd = mkstemp(tmp_name);
-
   if (tmp_fd == -1) {
     elf_end(e);
-    return NULL;
+    DP("ERROR: Cannot create %s\n", tmp_name);
+    exit(OFFLOAD_FAIL);
   }
 
   FILE *ftmp = fdopen(tmp_fd, "wb");
-
   if (!ftmp) {
     elf_end(e);
-    return NULL;
+    DP("ERROR: Cannot open %s\n", tmp_name);
+    exit(OFFLOAD_FAIL);
   }
 
   fwrite(image->ImageStart, ImageSize, 1, ftmp);
   fclose(ftmp);
 
-  DP("Trying to send lib to HDFS\n");
+  DP("Trying to send lib to the cloud storage\n");
 
   // Sending file to HDFS as the library to be loaded
   DeviceInfo.Providers[device_id]->send_file(tmp_name, "libmr.so");
@@ -351,9 +372,9 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   DynLibTy Lib = {tmp_name, dlopen(tmp_name, RTLD_LAZY)};
 
   if (!Lib.Handle) {
-    DP("target library loading error: %s\n", dlerror());
+    DP("ERROR: target library loading error: %s\n", dlerror());
     elf_end(e);
-    return NULL;
+    exit(OFFLOAD_FAIL);
   }
 
 #ifndef __APPLE__
@@ -379,9 +400,9 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   __tgt_offload_entry *entries_end = entries_begin + NumEntries;
 
   if (!entries_begin) {
-    DP("Can't obtain entries begin\n");
+    DP("ERROR: Can't obtain entries begin\n");
     elf_end(e);
-    return NULL;
+    exit(OFFLOAD_FAIL);
   }
 
   DP("Entries table range is (%016lx)->(%016lx)\n", (Elf64_Addr)entries_begin,
@@ -415,8 +436,8 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
                            int64_t size, int32_t id) {
   float sizeInMB = size / (1024 * 1024);
   if (size > MAX_JAVA_INT) {
-    DP("Not supported: size of %d is larger (%.2fMB) than the maximal size of "
-       "JVM's bytearrays (%.2fMB).\n",
+    DP("ERROR: Not supported -- size of %d is larger (%.2fMB) than the maximal "
+       "size of JVM's bytearrays (%.2fMB).\n",
        id, sizeInMB, MAX_SIZE_IN_MB);
     exit(OFFLOAD_FAIL);
   }
@@ -446,7 +467,7 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   } else {
     std::ofstream tmpfile(host_filepath);
     if (!tmpfile.is_open()) {
-      DP("Failed to open temporary file\n");
+      DP("ERROR: Failed to open temporary file\n");
       exit(OFFLOAD_FAIL);
     }
     tmpfile.write((const char *)hst_ptr, size);
@@ -475,8 +496,8 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                              int64_t size, int32_t id) {
   float sizeInMB = size / (1024 * 1024);
   if (size > MAX_JAVA_INT) {
-    DP("Not supported: size of %d is larger (%.1fMB) than the maximal size of "
-       "JVM's bytearrays (%.1fMB).\n",
+    DP("ERROR: Not supported -- size of %d is larger (%.1fMB) than the maximal "
+       "size of JVM's bytearrays (%.1fMB).\n",
        id, sizeInMB, MAX_SIZE_IN_MB);
     exit(OFFLOAD_FAIL);
   }
@@ -523,15 +544,15 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
     FILE *ftmp = fopen(host_filepath.c_str(), "rb");
 
     if (!ftmp) {
-      DP("Could not open temporary file.\n");
-      return OFFLOAD_FAIL;
+      DP("ERROR: Could not open temporary file.\n");
+      exit(OFFLOAD_FAIL);
     }
 
     if (fread(hst_ptr, 1, size, ftmp) != size) {
-      DP("Could not successfully read temporary file. => %ld\n", size);
+      DP("ERROR: Could not successfully read temporary file. => %ld\n", size);
       fclose(ftmp);
       remove(host_filepath.c_str());
-      return OFFLOAD_FAIL;
+      exit(OFFLOAD_FAIL);
     }
 
     fclose(ftmp);

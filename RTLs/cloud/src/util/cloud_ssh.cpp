@@ -88,7 +88,7 @@ int ssh_copy(ssh_session session, const char *filename, const char *destpath,
   void *fbuffer = malloc(size * sizeof(char));
 
   if (!file) {
-    fprintf(stderr, "Could not open temporary file.\n");
+    fprintf(stderr, "ERROR: Could not open temporary file.\n");
     return OFFLOAD_FAIL;
   }
 
