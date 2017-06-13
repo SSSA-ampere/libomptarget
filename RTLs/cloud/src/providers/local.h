@@ -19,10 +19,6 @@
 CloudProvider *createLocalProvider(ResourceInfo &resources);
 
 class LocalProvider : public CloudProvider  {
-protected:
-
-  int32_t submit_local();
-
 public:
   LocalProvider(ResourceInfo resources) : CloudProvider(resources) {}
   ~LocalProvider();
