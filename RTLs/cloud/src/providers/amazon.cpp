@@ -187,6 +187,7 @@ int32_t AmazonProvider::submit_job() {
   }
 
   // Run Spark
+  DP("Submit Spark job to the cluster driver\n");
   std::string cmd = "export AWS_ACCESS_KEY_ID=" + ainfo.AccessKey +
                     " && export AWS_SECRET_ACCESS_KEY=" + ainfo.SecretKey +
                     " && " + spark.BinPath + "spark-submit --name " + "\"" +

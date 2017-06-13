@@ -85,6 +85,8 @@ int32_t LocalProvider::delete_file(std::string filename) {
 }
 
 int32_t LocalProvider::submit_job() {
+  DP("Submit Spark job\n");
+
   std::string cmd = "spark-submit";
 
   // Spark job entry point

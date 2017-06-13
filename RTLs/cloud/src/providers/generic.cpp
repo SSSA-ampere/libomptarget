@@ -271,6 +271,7 @@ int32_t GenericProvider::submit_cluster() {
   }
 
   // Run Spark
+  DP("Submit Spark job to the cluster driver\n");
   std::string cmd = spark.BinPath + "spark-submit --master spark://" +
                     spark.ServAddress + ":" + std::to_string(spark.ServPort) +
                     " " + spark.AdditionalArgs + " --class " + spark.Package +

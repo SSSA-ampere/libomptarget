@@ -213,6 +213,7 @@ int32_t AzureProvider::submit_job() {
   }
 
   // Run Spark
+  DP("Submit Spark job to the cluster driver\n");
   std::string cmd = spark.BinPath + "spark-submit --name " + "\"" + __progname +
                     "\"" + " --master yarn-cluster --deploy-mode cluster " +
                     spark.AdditionalArgs + " --class " + spark.Package +
