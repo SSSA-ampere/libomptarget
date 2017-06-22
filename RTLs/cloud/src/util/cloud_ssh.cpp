@@ -183,9 +183,9 @@ int ssh_run(ssh_session session, const char *cmd) {
     return SSH_ERROR;
   }
 
-  ssh_channel_send_eof(channel);
+  rc = ssh_channel_get_exit_status(channel);
   ssh_channel_close(channel);
   ssh_channel_free(channel);
 
-  return OFFLOAD_SUCCESS;
+  return rc;
 }
