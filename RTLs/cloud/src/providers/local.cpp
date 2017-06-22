@@ -98,7 +98,8 @@ int32_t LocalProvider::submit_job() {
   cmd += " " + get_job_args();
 
   if (execute_command(cmd.c_str(), true)) {
-    return OFFLOAD_FAIL;
+    perror("ERROR: Spark job failed\n");
+    exit(OFFLOAD_FAIL);
   }
 
   return OFFLOAD_SUCCESS;
