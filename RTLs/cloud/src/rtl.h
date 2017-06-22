@@ -38,6 +38,7 @@ struct SparkInfo {
   std::string WorkingDir;
   bool Compression;
   std::string CompressionFormat;
+  bool UseThreads;
   uintptr_t currAddr;
 };
 

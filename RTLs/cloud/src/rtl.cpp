@@ -218,6 +218,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       reader.Get("Spark", "WorkingDir", ""),
       reader.GetBoolean("Spark", "Compression", true),
       reader.Get("Spark", "CompressionFormat", DEFAULT_COMPRESSION_FORMAT),
+      reader.GetBoolean("Spark", "UseThreads", true),
       1,
   };
 
@@ -569,16 +570,24 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
     DP("No need to submit pointer\n");
     return OFFLOAD_SUCCESS;
   }
-
-  DeviceInfo.submitting_threads[device_id].push_back(
-      std::thread(data_submit, device_id, tgt_ptr, hst_ptr, size, id));
+  if (DeviceInfo.SparkClusters[device_id].UseThreads) {
+    DeviceInfo.submitting_threads[device_id].push_back(
+        std::thread(data_submit, device_id, tgt_ptr, hst_ptr, size, id));
+  } else {
+    return data_submit(device_id, tgt_ptr, hst_ptr, size, id);
+  }
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size, int32_t id) {
-  DeviceInfo.retrieving_threads[device_id].push_back(
-      std::thread(data_retrieve, device_id, hst_ptr, tgt_ptr, size, id));
+  if (DeviceInfo.SparkClusters[device_id].UseThreads) {
+    DeviceInfo.retrieving_threads[device_id].push_back(
+        std::thread(data_retrieve, device_id, hst_ptr, tgt_ptr, size, id));
+  } else {
+    return data_retrieve(device_id, hst_ptr, tgt_ptr, size, id);
+  }
+
   return OFFLOAD_SUCCESS;
 }
 
@@ -596,11 +605,12 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr, int32_t id) {
 }
 
 int32_t __tgt_rtl_run_barrier_end(int32_t device_id) {
-  for (auto it = DeviceInfo.retrieving_threads[device_id].begin();
-       it != DeviceInfo.retrieving_threads[device_id].end(); it++) {
-    (*it).join();
+  if (DeviceInfo.SparkClusters[device_id].UseThreads) {
+    for (auto it = DeviceInfo.retrieving_threads[device_id].begin();
+         it != DeviceInfo.retrieving_threads[device_id].end(); it++) {
+      (*it).join();
+    }
   }
-
   return OFFLOAD_SUCCESS;
 }
 
@@ -613,9 +623,11 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   DeviceInfo.Providers[device_id]->send_file(fileName, "addressTable");
   remove(fileName);
 
-  for (auto it = DeviceInfo.submitting_threads[device_id].begin();
-       it != DeviceInfo.submitting_threads[device_id].end(); it++) {
-    (*it).join();
+  if (DeviceInfo.SparkClusters[device_id].UseThreads) {
+    for (auto it = DeviceInfo.submitting_threads[device_id].begin();
+         it != DeviceInfo.submitting_threads[device_id].end(); it++) {
+      (*it).join();
+    }
   }
 
   auto t_start = std::chrono::high_resolution_clock::now();
