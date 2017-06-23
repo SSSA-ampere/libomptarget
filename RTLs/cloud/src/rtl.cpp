@@ -363,13 +363,6 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   fwrite(image->ImageStart, ImageSize, 1, ftmp);
   fclose(ftmp);
 
-  DP("Trying to send lib to the cloud storage\n");
-
-  // Sending file to HDFS as the library to be loaded
-  DeviceInfo.Providers[device_id]->send_file(tmp_name, "libmr.so");
-
-  DP("Lib sent to HDFS!\n");
-
   DynLibTy Lib = {tmp_name, dlopen(tmp_name, RTLD_LAZY)};
 
   if (!Lib.Handle) {
@@ -413,6 +406,15 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   elf_end(e);
 
 #endif
+
+
+
+  DP("Trying to send lib to the cloud storage\n");
+
+  // Sending file to HDFS as the library to be loaded
+  DeviceInfo.Providers[device_id]->send_file(tmp_name, "libmr.so");
+
+  DP("Lib sent to HDFS!\n");
 
   remove(tmp_name);
 
