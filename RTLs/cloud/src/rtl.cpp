@@ -612,6 +612,7 @@ int32_t __tgt_rtl_run_barrier_end(int32_t device_id) {
          it != DeviceInfo.retrieving_threads[device_id].end(); it++) {
       (*it).join();
     }
+    DeviceInfo.retrieving_threads[device_id].clear();
   }
   return OFFLOAD_SUCCESS;
 }
@@ -630,6 +631,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
          it != DeviceInfo.submitting_threads[device_id].end(); it++) {
       (*it).join();
     }
+    DeviceInfo.submitting_threads[device_id].clear();
   }
 
   auto t_start = std::chrono::high_resolution_clock::now();
