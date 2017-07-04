@@ -52,6 +52,9 @@ class CloudFileSystem(fs: FileSystem, path: String, compressOption: String) {
   def write(name: Integer, size: Integer, data: Array[Byte]): Unit = {
     val compressIt = compress && size >= MIN_SIZE_COMPRESSION
     val filepath = new Path(path + name)
+    if (data.size != size)
+      throw new RuntimeException("Wrong output size of " +
+        filepath.toString() + " : " + data.size + " instead of " + size)
     var os: OutputStream = fs.create(filepath)
     if (compressIt)
       os = codec.createOutputStream(os)
