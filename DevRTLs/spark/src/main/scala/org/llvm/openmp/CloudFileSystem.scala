@@ -42,11 +42,10 @@ class CloudFileSystem(fs: FileSystem, path: String, compressOption: String) {
     case "gzip" =>
       compress = true
       codec = ccf.getCodecByName(compressOption)
-    case "lz4" =>
-      compress = true
-      codec = ccf.getCodecByName(compressOption)
-    case _ =>
+    case "false" =>
       compress = false
+    case _ =>
+      throw new RuntimeException("Unsupported compression codec ("+ compressOption + ")")
   } 
 
   def write(name: Integer, size: Integer, data: Array[Byte]): Unit = {

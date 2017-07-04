@@ -35,11 +35,7 @@ class CloudInfo(args: Array[String]) {
   val username = args(2)
   val path = args(3)
 
-  val conf = new SparkConf()
-    //.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    //.registerKryoClasses(Array(classOf[CloudFileSystem], classOf[CloudInfo]))
-    //.set("spark.kryoserializer.buffer.max", "2047m")
-    .set("spark.driver.maxResultSize", "0")
+  val conf = new SparkConf().set("spark.driver.maxResultSize", "0")
 
   val session = SparkSession.builder().config(conf).getOrCreate()
 
@@ -52,15 +48,8 @@ class CloudInfo(args: Array[String]) {
       fsConf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
       fsConf.set("fs.s3a.awsAccessKeyId", args(4))
       fsConf.set("fs.s3a.awsSecretAccessKey", args(5))
-
-    //fsConf.set("fs.s3n.impl", "org.apache.hadoop.fs.s3native.NativeS3FileSystem")
-    //fsConf.set("fs.s3n.awsAccessKeyId", accessKey)
-    //fsConf.set("fs.s3n.awsSecretAccessKey", secretKey)
-
-    //fsConf.set("fs.defaultFS", uri)
     case "HDFS" =>
       System.setProperty("HADOOP_USER_NAME", username)
-    //sc.hadoopConfiguration.set("fs.defaultFS", uri)
     case "FILE" =>
     case "" =>
     case _ => throw new RuntimeException(filesystem + " is not a supported file system.")
