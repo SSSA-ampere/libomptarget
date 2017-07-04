@@ -452,7 +452,7 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
   // Since we now need the hdfs file, we create it here
   std::string filename = std::to_string(id);
-  std::string host_filepath = working_path + filename;
+  std::string host_filepath = working_path + "/" + filename;
 
   int64_t sendingSize;
   if (needCompression) {
@@ -511,7 +511,7 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                            size >= MIN_SIZE_COMPRESSION;
 
   std::string filename = std::to_string(id);
-  std::string host_filepath = working_path + filename;
+  std::string host_filepath = working_path + "/" + filename;
 
   auto t_start = std::chrono::high_resolution_clock::now();
   DeviceInfo.Providers[device_id]->get_file(host_filepath, filename);
