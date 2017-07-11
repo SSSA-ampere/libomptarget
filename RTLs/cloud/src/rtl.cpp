@@ -58,6 +58,8 @@ static RTLDeviceInfoTy DeviceInfo;
 
 static std::string working_path;
 
+static char *library_tmpfile = strdup("/tmp/libompcloudXXXXXX");
+
 RTLDeviceInfoTy::RTLDeviceInfoTy()
     : reader(new INIReader(getenv(OMPCLOUD_CONF_ENV))) {
 
@@ -106,7 +108,7 @@ RTLDeviceInfoTy::RTLDeviceInfoTy()
   retrieving_threads.resize(NumberOfDevices);
 
   for (int i = 0; i < NumberOfDevices; i++) {
-    char *tmpname = strdup((working_path + "/tmpfileXXXXXX").c_str());
+    char *tmpname = strdup((working_path + "/addresstable_XXXXXX").c_str());
     if (tmpname == NULL) {
       DP("Error: problem on strdup\n");
       DP("Working path = %s\n", working_path.c_str());
@@ -345,8 +347,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   //
   // 1) Create tmp file with the library contents
   // 2) Use dlopen to load the file and dlsym to retrieve the symbols
-  char *tmp_name = strdup("/tmp/tmpfileXXXXXX");
-  int tmp_fd = mkstemp(tmp_name);
+  int tmp_fd = mkstemp(library_tmpfile);
   if (tmp_fd < 0) {
     elf_end(e);
     DP("ERROR: Cannot create %s\n", tmp_name);
@@ -363,7 +364,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   fwrite(image->ImageStart, ImageSize, 1, ftmp);
   fclose(ftmp);
 
-  DynLibTy Lib = {tmp_name, dlopen(tmp_name, RTLD_LAZY)};
+  DynLibTy Lib = {library_tmpfile, dlopen(library_tmpfile, RTLD_LAZY)};
 
   if (!Lib.Handle) {
     DP("ERROR: target library loading error: %s\n", dlerror());
@@ -408,18 +409,6 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   elf_end(e);
 
 #endif
-
-  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
-    DP("Trying to send lib to the cloud storage\n");
-
-  // Sending file to HDFS as the library to be loaded
-  DeviceInfo.Providers[device_id]->send_file(tmp_name, "libmr.so");
-
-  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
-    DP("Lib sent to HDFS!\n");
-
-  if (!DeviceInfo.SparkClusters[device_id].KeepTmpFiles)
-    remove(tmp_name);
 
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }
@@ -634,8 +623,12 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
                                          int32_t team_num,
                                          int32_t thread_limit) {
   ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
+
+  DP("Send library and address table to the Spark driver\n");
   const char *fileName = DeviceInfo.AddressTables[device_id].c_str();
   DeviceInfo.Providers[device_id]->send_file(fileName, "addressTable");
+  DeviceInfo.Providers[device_id]->send_file(library_tmpfile, "libmr.so");
+  DP("Done!\n");
 
   if (!DeviceInfo.SparkClusters[device_id].KeepTmpFiles)
     remove(fileName);
