@@ -36,14 +36,14 @@ CloudProvider *createAzureProvider(ResourceInfo &resources) {
   return new AzureProvider(resources);
 }
 
-int32_t AzureProvider::parse_config(INIReader reader) {
-  ainfo.Container = reader.Get("AzureProvider", "Container", "");
+int32_t AzureProvider::parse_config(INIReader *reader) {
+  ainfo.Container = reader->Get("AzureProvider", "Container", "");
   if (ainfo.Container.empty()) {
     DP("Warning: Did not find Azure container name, use default.\n");
     ainfo.Container = DEFAULT_AZURE_CONTAINER;
   }
 
-  ainfo.StorageAccount = reader.Get("AzureProvider", "StorageAccount", "");
+  ainfo.StorageAccount = reader->Get("AzureProvider", "StorageAccount", "");
   if (ainfo.StorageAccount.empty()) {
     if (char *envSecretKey = std::getenv("AZURE_STORAGE_ACCOUNT")) {
       ainfo.StorageAccount = std::string(envSecretKey);
@@ -54,7 +54,7 @@ int32_t AzureProvider::parse_config(INIReader reader) {
     }
   }
 
-  ainfo.AccessKey = reader.Get("AzureProvider", "StorageAccessKey", "");
+  ainfo.AccessKey = reader->Get("AzureProvider", "StorageAccessKey", "");
   if (ainfo.AccessKey.empty()) {
     if (char *envAccessKey = std::getenv("AZURE_STORAGE_ACCESS_KEY")) {
       ainfo.AccessKey = std::string(envAccessKey);
@@ -65,14 +65,14 @@ int32_t AzureProvider::parse_config(INIReader reader) {
     }
   }
 
-  ainfo.Cluster = reader.Get("AzureProvider", "Cluster", "");
+  ainfo.Cluster = reader->Get("AzureProvider", "Cluster", "");
   if (ainfo.Cluster.empty()) {
     DP("ERROR: Did not find Azure cluster name.\n");
     exit(OFFLOAD_FAIL);
   }
 
   // FIXME: not used anymore ?
-  ainfo.AdditionalArgs = reader.Get("AzureProvider", "AdditionalArgs", "");
+  ainfo.AdditionalArgs = reader->Get("AzureProvider", "AdditionalArgs", "");
 
   return OFFLOAD_SUCCESS;
 }
@@ -219,7 +219,7 @@ int32_t AzureProvider::submit_job() {
                     spark.AdditionalArgs + " --class " + spark.Package +
                     " /tmp/" + JarFileName + " " + get_job_args();
 
-  rc = ssh_run(aws_session, cmd.c_str());
+  rc = ssh_run(aws_session, cmd.c_str(), spark.VerboseMode != Verbosity::quiet);
   if (rc != SSH_OK) {
     fprintf(stderr, "ERROR: Spark job execution through SSH failed %s\n",
             ssh_get_error(aws_session));

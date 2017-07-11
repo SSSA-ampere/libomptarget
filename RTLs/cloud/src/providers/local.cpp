@@ -33,13 +33,16 @@
 
 static std::string working_path;
 
-LocalProvider::~LocalProvider() { remove_directory(working_path.c_str()); }
+LocalProvider::~LocalProvider() {
+  if (!spark.KeepTmpFiles)
+    remove_directory(working_path.c_str());
+}
 
 CloudProvider *createLocalProvider(ResourceInfo &resources) {
   return new LocalProvider(resources);
 }
 
-int32_t LocalProvider::parse_config(INIReader reader) {
+int32_t LocalProvider::parse_config(INIReader *reader) {
   return OFFLOAD_SUCCESS;
 }
 
@@ -82,7 +85,8 @@ int32_t LocalProvider::get_file(std::string host_filename,
 
 int32_t LocalProvider::delete_file(std::string filename) {
   DP("Deleting file '%s'\n", filename.c_str());
-  remove(get_cloud_path(filename).c_str());
+  if (!spark.KeepTmpFiles)
+    remove(get_cloud_path(filename).c_str());
   return OFFLOAD_SUCCESS;
 }
 
@@ -99,7 +103,7 @@ int32_t LocalProvider::submit_job() {
   // Execution arguments pass to the spark kernel
   cmd += " " + get_job_args();
 
-  if (execute_command(cmd.c_str(), true)) {
+  if (execute_command(cmd.c_str(), spark.VerboseMode != Verbosity::quiet)) {
     perror("ERROR: Spark job failed\n");
     exit(OFFLOAD_FAIL);
   }

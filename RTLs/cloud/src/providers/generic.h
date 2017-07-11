@@ -36,7 +36,7 @@ protected:
 public:
   GenericProvider(ResourceInfo resources) : CloudProvider(resources) {}
 
-  virtual int32_t parse_config(INIReader reader);
+  virtual int32_t parse_config(INIReader *reader);
   virtual int32_t init_device();
   virtual int32_t send_file(std::string filename, std::string tgtfilename);
   virtual int32_t get_file(std::string host_filename, std::string filename);

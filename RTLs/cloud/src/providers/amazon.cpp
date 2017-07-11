@@ -36,12 +36,12 @@ CloudProvider *createAmazonProvider(ResourceInfo &resources) {
   return new AmazonProvider(resources);
 }
 
-int32_t AmazonProvider::parse_config(INIReader reader) {
-  ainfo.Bucket = reader.Get("AmazonProvider", "Bucket", DEFAULT_AWS_BUCKET);
+int32_t AmazonProvider::parse_config(INIReader *reader) {
+  ainfo.Bucket = reader->Get("AmazonProvider", "Bucket", DEFAULT_AWS_BUCKET);
   if (ainfo.Bucket.empty())
     DP("WARNING: Did not find S3 bucket name, use default.\n");
 
-  ainfo.AccessKey = reader.Get("AmazonProvider", "AccessKey", "");
+  ainfo.AccessKey = reader->Get("AmazonProvider", "AccessKey", "");
   if (ainfo.AccessKey.empty()) {
     if (char *envAccessKey = std::getenv("AWS_ACCESS_KEY_ID")) {
       ainfo.AccessKey = std::string(envAccessKey);
@@ -52,7 +52,7 @@ int32_t AmazonProvider::parse_config(INIReader reader) {
     }
   }
 
-  ainfo.SecretKey = reader.Get("AmazonProvider", "SecretKey", "");
+  ainfo.SecretKey = reader->Get("AmazonProvider", "SecretKey", "");
   if (ainfo.SecretKey.empty()) {
     if (char *envSecretKey = std::getenv("AWS_SECRET_ACCESS_KEY")) {
       ainfo.SecretKey = std::string(envSecretKey);
@@ -64,9 +64,9 @@ int32_t AmazonProvider::parse_config(INIReader reader) {
   }
 
   // FIXME: not used anymore ?
-  ainfo.Cluster = reader.Get("AmazonProvider", "Cluster", "");
-  ainfo.KeyFile = reader.Get("AmazonProvider", "KeyFile", "");
-  ainfo.AdditionalArgs = reader.Get("AmazonProvider", "AdditionalArgs", "");
+  ainfo.Cluster = reader->Get("AmazonProvider", "Cluster", "");
+  ainfo.KeyFile = reader->Get("AmazonProvider", "KeyFile", "");
+  ainfo.AdditionalArgs = reader->Get("AmazonProvider", "AdditionalArgs", "");
 
   return OFFLOAD_SUCCESS;
 }
@@ -197,7 +197,7 @@ int32_t AmazonProvider::submit_job() {
                     " /tmp/" + JarFileName + " " + get_job_args() + " " +
                     ainfo.AccessKey + " " + ainfo.SecretKey;
 
-  rc = ssh_run(aws_session, cmd.c_str());
+  rc = ssh_run(aws_session, cmd.c_str(), spark.VerboseMode != Verbosity::quiet);
   if (rc != SSH_OK) {
     fprintf(stderr, "ERROR: Spark job execution through SSH failed %s\n",
             ssh_get_error(aws_session));

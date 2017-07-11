@@ -58,11 +58,13 @@ static RTLDeviceInfoTy DeviceInfo;
 
 static std::string working_path;
 
-RTLDeviceInfoTy::RTLDeviceInfoTy() {
+RTLDeviceInfoTy::RTLDeviceInfoTy()
+    : reader(new INIReader(getenv(OMPCLOUD_CONF_ENV))) {
 
-  const char *conf_filename = getenv(OMPCLOUD_CONF_ENV);
-  if (conf_filename == NULL) {
-    conf_filename = DEFAULT_OMPCLOUD_CONF_FILE;
+  if (reader->ParseError() < 0) {
+    DP("OmpCloud: Path to the configuration file seems wrong (%s)\n",
+       ConfFilePath);
+    exit(EXIT_FAILURE);
   }
 
   char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
@@ -75,13 +77,11 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
   std::string cmd("mkdir -p " + working_path);
   DP("%s\n", exec_cmd(cmd.c_str()).c_str());
 
-  INIReader reader(conf_filename);
-
   NumberOfDevices = 0;
 
   // Checking how many providers we have in the configuration file
   for (auto entry : ExistingProviderList) {
-    if (reader.HasSection(entry.SectionName)) {
+    if (reader->HasSection(entry.SectionName)) {
       DP("Provider '%s' detected in configuration file.\n",
          entry.ProviderName.c_str());
       ProviderList.push_back(entry);
@@ -110,12 +110,12 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
     if (tmpname == NULL) {
       DP("Error: problem on strdup\n");
       DP("Working path = %s\n", working_path.c_str());
-      exit(OFFLOAD_FAIL);
+      exit(EXIT_FAILURE);
     }
     int ret = mkstemp(tmpname);
     if (ret < 0) {
       DP("Error when making %s\n", tmpname);
-      exit(OFFLOAD_FAIL);
+      exit(EXIT_FAILURE);
     }
     AddressTables.push_back(std::string(tmpname));
   }
@@ -130,7 +130,9 @@ RTLDeviceInfoTy::~RTLDeviceInfoTy() {
     DP("Decompression = %ds\n", timing.DecompressionTime);
     DP("Execution = %ds\n", timing.SparkExecutionTime);
   }
-  remove_directory(working_path.c_str());
+
+  if (!DeviceInfo.SparkClusters[0].KeepTmpFiles)
+    remove_directory(working_path.c_str());
 }
 
 void RTLDeviceInfoTy::createOffloadTable(int32_t device_id,
@@ -176,24 +178,11 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 
   DP("Initializing device %d\n", device_id);
 
-  const char *conf_filename = getenv(OMPCLOUD_CONF_ENV);
-  if (conf_filename == NULL) {
-    conf_filename = DEFAULT_OMPCLOUD_CONF_FILE;
-  }
-  DP("Used OmpCloud configuration file: %s\n", conf_filename);
-
-  // Parsing configurations
-  INIReader reader(conf_filename);
-
-  if (reader.ParseError() < 0) {
-    DP("ERROR: Couldn't find the given configuration '%s'!", conf_filename);
-    exit(OFFLOAD_FAIL);
-  }
-
   // TODO: Check connection to Apache Spark cluster
 
   SparkMode mode;
-  std::string smode = reader.Get("Spark", "Mode", DEFAULT_SPARK_MODE);
+  std::string smode =
+      DeviceInfo.reader->Get("Spark", "Mode", DEFAULT_SPARK_MODE);
   if (smode == "client") {
     mode = SparkMode::client;
   } else if (smode == "cluster") {
@@ -205,20 +194,24 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
   }
 
   SparkInfo spark{
-      reader.Get("Spark", "HostName", ""),
-      (int)reader.GetInteger("Spark", "Port", DEFAULT_SPARK_PORT),
+      DeviceInfo.reader->Get("Spark", "HostName", ""),
+      (int)DeviceInfo.reader->GetInteger("Spark", "Port", DEFAULT_SPARK_PORT),
       mode,
-      reader.Get("Spark", "User", DEFAULT_SPARK_USER),
-      reader.Get("Spark", "BinPath", ""),
-      reader.Get("Spark", "Package", DEFAULT_SPARK_PACKAGE),
-      reader.Get("Spark", "JarPath", DEFAULT_SPARK_JARPATH),
-      (int)reader.GetInteger("Spark", "PollInterval",
-                             DEFAULT_SPARK_POLLINTERVAL),
-      reader.Get("Spark", "AdditionalArgs", ""),
-      reader.Get("Spark", "WorkingDir", ""),
-      reader.GetBoolean("Spark", "Compression", true),
-      reader.Get("Spark", "CompressionFormat", DEFAULT_COMPRESSION_FORMAT),
-      reader.GetBoolean("Spark", "UseThreads", true),
+      DeviceInfo.reader->Get("Spark", "User", DEFAULT_SPARK_USER),
+      DeviceInfo.reader->Get("Spark", "BinPath", ""),
+      DeviceInfo.reader->Get("Spark", "Package", DEFAULT_SPARK_PACKAGE),
+      DeviceInfo.reader->Get("Spark", "JarPath", DEFAULT_SPARK_JARPATH),
+      (int)DeviceInfo.reader->GetInteger("Spark", "PollInterval",
+                                         DEFAULT_SPARK_POLLINTERVAL),
+      DeviceInfo.reader->Get("Spark", "AdditionalArgs", ""),
+      DeviceInfo.reader->Get("Spark", "WorkingDir", ""),
+      DeviceInfo.reader->GetBoolean("Spark", "Compression", true),
+      DeviceInfo.reader->Get("Spark", "CompressionFormat",
+                             DEFAULT_COMPRESSION_FORMAT),
+      DeviceInfo.reader->GetBoolean("Spark", "UseThreads", true),
+      (Verbosity)DeviceInfo.reader->GetInteger("Spark", "VerboseMode",
+                                               Verbosity::info),
+      DeviceInfo.reader->GetBoolean("Spark", "KeepTmpFiles", false),
       1,
   };
 
@@ -242,14 +235,16 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
   if (spark.Mode == SparkMode::invalid || !spark.Package.compare("") ||
       !spark.JarPath.compare("")) {
     DP("ERROR: Invalid values in 'cloud_rtl.ini' for Spark!");
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
-  DP("Spark HostName: '%s' - Port: '%d' - User: '%s' - Mode: %s\n",
-     spark.ServAddress.c_str(), spark.ServPort, spark.UserName.c_str(),
-     smode.c_str());
-  DP("Jar: %s - Class: %s - WorkingDir: '%s'\n", spark.JarPath.c_str(),
-     spark.Package.c_str(), spark.WorkingDir.c_str());
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet) {
+    DP("Spark HostName: '%s' - Port: '%d' - User: '%s' - Mode: %s\n",
+       spark.ServAddress.c_str(), spark.ServPort, spark.UserName.c_str(),
+       smode.c_str());
+    DP("Jar: %s - Class: %s - WorkingDir: '%s'\n", spark.JarPath.c_str(),
+       spark.Package.c_str(), spark.WorkingDir.c_str());
+  }
 
   DeviceInfo.SparkClusters[device_id] = spark;
 
@@ -257,12 +252,13 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 
   // Checking for listed provider. Each device id refers to a provider position
   // in the list
-  DP("Creating provider %s\n", ProviderList[device_id].ProviderName.c_str());
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Creating provider %s\n", ProviderList[device_id].ProviderName.c_str());
 
   std::string providerSectionName = ProviderList[device_id].SectionName;
   DeviceInfo.Providers[device_id] =
       ProviderList[device_id].ProviderGenerator(resources);
-  DeviceInfo.Providers[device_id]->parse_config(reader);
+  DeviceInfo.Providers[device_id]->parse_config(DeviceInfo.reader);
   DeviceInfo.Providers[device_id]->init_device();
 
   return OFFLOAD_SUCCESS; // success
@@ -279,17 +275,20 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   }
   working_path = tempdir;
   std::string cmd("mkdir -p " + working_path);
-  DP("%s\n", exec_cmd(cmd.c_str()).c_str());
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode == Verbosity::debug)
+    DP("%s\n", exec_cmd(cmd.c_str()).c_str());
 
-  DP("Dev %d: load binary from 0x%llx image\n", device_id,
-     (long long)image->ImageStart);
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Dev %d: load binary from 0x%llx image\n", device_id,
+       (long long)image->ImageStart);
 
   assert(device_id >= 0 && device_id < DeviceInfo.NumberOfDevices &&
          "bad dev id");
 
   size_t ImageSize = (size_t)image->ImageEnd - (size_t)image->ImageStart;
   size_t NumEntries = (size_t)(image->EntriesEnd - image->EntriesBegin);
-  DP("Expecting to have %ld entries defined.\n", (long)NumEntries);
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Expecting to have %ld entries defined.\n", (long)NumEntries);
 
   // We do not need to set the ELF version because the caller of this function
   // had to do that to decide the right runtime to use
@@ -334,30 +333,31 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   if (!entries_offset) {
     DP("ERROR: Entries Section Offset Not Found\n");
     elf_end(e);
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
-  DP("Offset of entries section is (%016lx).\n", entries_offset);
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Offset of entries section is (%016lx).\n", entries_offset);
 
   // load dynamic library and get the entry points. We use the dl library
-  // to do the loading of the library, but we could do it directly to avoid the
-  // dump to the temporary file.
+  // to do the loading of the library, but we could do it directly to avoid
+  // the dump to the temporary file.
   //
   // 1) Create tmp file with the library contents
   // 2) Use dlopen to load the file and dlsym to retrieve the symbols
   char *tmp_name = strdup("/tmp/tmpfileXXXXXX");
   int tmp_fd = mkstemp(tmp_name);
-  if (tmp_fd == -1) {
+  if (tmp_fd < 0) {
     elf_end(e);
     DP("ERROR: Cannot create %s\n", tmp_name);
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   FILE *ftmp = fdopen(tmp_fd, "wb");
   if (!ftmp) {
     elf_end(e);
     DP("ERROR: Cannot open %s\n", tmp_name);
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   fwrite(image->ImageStart, ImageSize, 1, ftmp);
@@ -368,7 +368,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   if (!Lib.Handle) {
     DP("ERROR: target library loading error: %s\n", dlerror());
     elf_end(e);
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
 #ifndef __APPLE__
@@ -378,7 +378,8 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   // plus the offset determined from the ELF file.
   Elf64_Addr entries_addr = libInfo->l_addr + entries_offset;
 
-  DP("Pointer to first entry to be loaded is (%016lx).\n", entries_addr);
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Pointer to first entry to be loaded is (%016lx).\n", entries_addr);
 
   // Table of pointers to all the entries in the target
   __tgt_offload_entry *entries_table = (__tgt_offload_entry *)entries_addr;
@@ -396,27 +397,29 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   if (!entries_begin) {
     DP("ERROR: Can't obtain entries begin\n");
     elf_end(e);
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
-  DP("Entries table range is (%016lx)->(%016lx)\n", (Elf64_Addr)entries_begin,
-     (Elf64_Addr)entries_end)
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Entries table range is (%016lx)->(%016lx)\n", (Elf64_Addr)entries_begin,
+       (Elf64_Addr)entries_end)
   DeviceInfo.createOffloadTable(device_id, entries_begin, entries_end);
 
   elf_end(e);
 
 #endif
 
-
-
-  DP("Trying to send lib to the cloud storage\n");
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Trying to send lib to the cloud storage\n");
 
   // Sending file to HDFS as the library to be loaded
   DeviceInfo.Providers[device_id]->send_file(tmp_name, "libmr.so");
 
-  DP("Lib sent to HDFS!\n");
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Lib sent to HDFS!\n");
 
-  remove(tmp_name);
+  if (!DeviceInfo.SparkClusters[device_id].KeepTmpFiles)
+    remove(tmp_name);
 
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }
@@ -439,10 +442,10 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
                            int64_t size, int32_t id) {
   float sizeInMB = size / (1024 * 1024);
   if (size > MAX_JAVA_INT) {
-    DP("ERROR: Not supported -- size of %d is larger (%.2fMB) than the maximal "
-       "size of JVM's bytearrays (%.2fMB).\n",
+    DP("ERROR: Not supported -- size of %d is larger (%.2fMB) than the "
+       "maximal size of JVM's bytearrays (%.2fMB).\n",
        id, sizeInMB, MAX_SIZE_IN_MB);
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
@@ -471,7 +474,7 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
     std::ofstream tmpfile(host_filepath);
     if (!tmpfile.is_open()) {
       DP("ERROR: Failed to open temporary file\n");
-      exit(OFFLOAD_FAIL);
+      exit(EXIT_FAILURE);
     }
     tmpfile.write((const char *)hst_ptr, size);
     tmpfile.close();
@@ -488,9 +491,12 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   timing.UploadTime_mutex.lock();
   timing.UploadTime += t_delay;
   timing.UploadTime_mutex.unlock();
-  DP("Uploaded %.1fMB in %lds\n", sendingSizeInMB, t_delay);
 
-  remove(host_filepath.c_str());
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Uploaded %.1fMB in %lds\n", sendingSizeInMB, t_delay);
+
+  if (!DeviceInfo.SparkClusters[device_id].KeepTmpFiles)
+    remove(host_filepath.c_str());
 
   return ret_val;
 }
@@ -499,10 +505,10 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                              int64_t size, int32_t id) {
   float sizeInMB = size / (1024 * 1024);
   if (size > MAX_JAVA_INT) {
-    DP("ERROR: Not supported -- size of %d is larger (%.1fMB) than the maximal "
-       "size of JVM's bytearrays (%.1fMB).\n",
+    DP("ERROR: Not supported -- size of %d is larger (%.1fMB) than the "
+       "maximal size of JVM's bytearrays (%.1fMB).\n",
        id, sizeInMB, MAX_SIZE_IN_MB);
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
@@ -521,7 +527,9 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
   timing.DownloadTime_mutex.lock();
   timing.DownloadTime += t_delay;
   timing.DownloadTime_mutex.unlock();
-  DP("Downloaded %.1fMB in %lds\n", sizeInMB, t_delay);
+
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Downloaded %.1fMB in %lds\n", sizeInMB, t_delay);
 
   if (needDecompression) {
     auto t_start = std::chrono::high_resolution_clock::now();
@@ -529,7 +537,7 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
     int decomp_size = decompress_file(host_filepath, (char *)hst_ptr, size);
     if (decomp_size != size) {
       DP("Decompressed data are not the right size. => %d\n", decomp_size);
-      exit(OFFLOAD_FAIL);
+      exit(EXIT_FAILURE);
     }
     auto t_end = std::chrono::high_resolution_clock::now();
     auto t_delay =
@@ -539,7 +547,8 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
     timing.DecompressionTime_mutex.lock();
     timing.DecompressionTime += t_delay;
     timing.DecompressionTime_mutex.unlock();
-    DP("Decompressed %.1fMB in %lds\n", sizeInMB, t_delay);
+    if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+      DP("Decompressed %.1fMB in %lds\n", sizeInMB, t_delay);
 
   } else {
 
@@ -547,21 +556,23 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
     FILE *ftmp = fopen(host_filepath.c_str(), "rb");
 
     if (!ftmp) {
-      DP("ERROR: Could not open temporary file.\n");
-      exit(OFFLOAD_FAIL);
+      perror("ERROR: Could not open temporary file.");
+      exit(EXIT_FAILURE);
     }
 
     if (fread(hst_ptr, 1, size, ftmp) != size) {
       DP("ERROR: Could not successfully read temporary file. => %ld\n", size);
       fclose(ftmp);
-      remove(host_filepath.c_str());
-      exit(OFFLOAD_FAIL);
+      if (!DeviceInfo.SparkClusters[device_id].KeepTmpFiles)
+        remove(host_filepath.c_str());
+      exit(EXIT_FAILURE);
     }
 
     fclose(ftmp);
   }
 
-  remove(host_filepath.c_str());
+  if (!DeviceInfo.SparkClusters[device_id].KeepTmpFiles)
+    remove(host_filepath.c_str());
 
   return OFFLOAD_SUCCESS;
 }
@@ -569,7 +580,8 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
                               int64_t size, int32_t id) {
   if (id < 0) {
-    DP("No need to submit pointer\n");
+    if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+      DP("No need to submit pointer\n");
     return OFFLOAD_SUCCESS;
   }
   if (DeviceInfo.SparkClusters[device_id].UseThreads) {
@@ -624,7 +636,9 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
   const char *fileName = DeviceInfo.AddressTables[device_id].c_str();
   DeviceInfo.Providers[device_id]->send_file(fileName, "addressTable");
-  remove(fileName);
+
+  if (!DeviceInfo.SparkClusters[device_id].KeepTmpFiles)
+    remove(fileName);
 
   if (DeviceInfo.SparkClusters[device_id].UseThreads) {
     for (auto it = DeviceInfo.submitting_threads[device_id].begin();
@@ -640,7 +654,9 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   auto t_delay =
       std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
   timing.SparkExecutionTime += t_delay;
-  DP("Spark job executed in %lds\n", t_delay);
+
+  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
+    DP("Spark job executed in %lds\n", t_delay);
 
   return ret_val;
 }

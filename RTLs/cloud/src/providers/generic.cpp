@@ -37,12 +37,12 @@ CloudProvider *createGenericProvider(ResourceInfo &resources) {
   return new GenericProvider(resources);
 }
 
-int32_t GenericProvider::parse_config(INIReader reader) {
+int32_t GenericProvider::parse_config(INIReader *reader) {
 
   hinfo = {
-      reader.Get("HdfsProvider", "HostName", ""),
-      (int)reader.GetInteger("HdfsProvider", "Port", DEFAULT_HDFS_PORT),
-      reader.Get("HdfsProvider", "User", ""),
+      reader->Get("HdfsProvider", "HostName", ""),
+      (int)reader->GetInteger("HdfsProvider", "Port", DEFAULT_HDFS_PORT),
+      reader->Get("HdfsProvider", "User", ""),
   };
 
   if (!hinfo.ServAddress.compare("") || !hinfo.UserName.compare("")) {
@@ -280,7 +280,7 @@ int32_t GenericProvider::submit_cluster() {
 
   DP("Executing SSH command: %s\n", cmd.c_str());
 
-  rc = ssh_run(session, cmd.c_str());
+  rc = ssh_run(session, cmd.c_str(), spark.VerboseMode != Verbosity::quiet);
   if (rc != SSH_OK) {
     fprintf(stderr, "ERROR: Spark job execution through SSH failed %s\n",
             ssh_get_error(session));
@@ -348,7 +348,7 @@ int32_t GenericProvider::submit_condor() {
 
   DP("Executing SSH command: %s\n", cmd.c_str());
 
-  rc = ssh_run(session, cmd.c_str());
+  rc = ssh_run(session, cmd.c_str(), spark.VerboseMode != Verbosity::quiet);
   if (rc != SSH_OK) {
     exit (OFFLOAD_FAIL);
   }
@@ -370,7 +370,7 @@ int32_t GenericProvider::submit_local() {
   // Execution arguments pass to the spark kernel
   cmd += " " + get_job_args();
 
-  if (execute_command(cmd.c_str(), true)) {
+  if (execute_command(cmd.c_str(), spark.VerboseMode != Verbosity::quiet)) {
     return OFFLOAD_FAIL;
   }
 

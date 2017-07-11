@@ -24,6 +24,7 @@ struct DynLibTy {
 extern const char *__progname; /* for job name */
 
 enum SparkMode { client, cluster, condor, invalid };
+enum Verbosity { debug, info, quiet };
 
 struct SparkInfo {
   std::string ServAddress;
@@ -39,6 +40,8 @@ struct SparkInfo {
   bool Compression;
   std::string CompressionFormat;
   bool UseThreads;
+  Verbosity VerboseMode;
+  bool KeepTmpFiles;
   uintptr_t currAddr;
 };
 
@@ -65,7 +68,6 @@ struct ElapsedTime {
 };
 
 #define OMPCLOUD_CONF_ENV "OMPCLOUD_CONF_PATH"
-#define DEFAULT_OMPCLOUD_CONF_FILE "ompcloud-conf.ini"
 #define DEFAULT_HDFS_PORT 9000
 #define DEFAULT_SPARK_PORT 7077
 #define DEFAULT_SPARK_USER "anonymous"
@@ -94,6 +96,8 @@ class RTLDeviceInfoTy {
 
 public:
   int NumberOfDevices;
+
+  INIReader* reader;
 
   std::vector<SparkInfo> SparkClusters;
   std::vector<CloudProvider *> Providers;

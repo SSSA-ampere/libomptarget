@@ -25,7 +25,7 @@ public:
 
   std::string get_cloud_path(std::string filename);
 
-  int32_t parse_config(INIReader reader);
+  int32_t parse_config(INIReader *reader);
   int32_t init_device();
   int32_t send_file(std::string filename, std::string tgtfilename);
   int32_t get_file(std::string host_filename, std::string filename);

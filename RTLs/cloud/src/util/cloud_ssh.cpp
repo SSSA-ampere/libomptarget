@@ -142,7 +142,7 @@ int ssh_copy(ssh_session session, const char *filename, const char *destpath,
   return OFFLOAD_SUCCESS;
 }
 
-int ssh_run(ssh_session session, const char *cmd) {
+int ssh_run(ssh_session session, const char *cmd, bool print_result) {
   int rc;
   char buffer[256];
   int nbytes;
@@ -167,7 +167,7 @@ int ssh_run(ssh_session session, const char *cmd) {
 
   nbytes = ssh_channel_read(channel, buffer, sizeof(buffer), 1);
   while (nbytes > 0) {
-    if (fwrite(buffer, 1, nbytes, stdout) != (unsigned int)nbytes) {
+    if (print_result && fwrite(buffer, 1, nbytes, stdout) != (unsigned int)nbytes) {
       fprintf(stderr, "Problem when displaying ssh buffer\n");
       ssh_channel_close(channel);
       ssh_channel_free(channel);
