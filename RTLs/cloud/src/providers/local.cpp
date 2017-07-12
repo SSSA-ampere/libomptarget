@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+
 #include <unistd.h>
 
 #include "INIReader.h"
@@ -84,14 +85,16 @@ int32_t LocalProvider::get_file(std::string host_filename,
 }
 
 int32_t LocalProvider::delete_file(std::string filename) {
-  DP("Deleting file '%s'\n", filename.c_str());
+  if (spark.VerboseMode != Verbosity::quiet)
+    DP("Deleting file '%s'\n", filename.c_str());
   if (!spark.KeepTmpFiles)
     remove(get_cloud_path(filename).c_str());
   return OFFLOAD_SUCCESS;
 }
 
 int32_t LocalProvider::submit_job() {
-  DP("Submit Spark job\n");
+  if (spark.VerboseMode != Verbosity::quiet)
+    DP("Submit Spark job\n");
 
   std::string cmd = "spark-submit";
 
@@ -104,7 +107,7 @@ int32_t LocalProvider::submit_job() {
   cmd += " " + get_job_args();
 
   if (execute_command(cmd.c_str(), spark.VerboseMode != Verbosity::quiet)) {
-    perror("ERROR: Spark job failed\n");
+    fprintf(stderr, "ERROR: Spark job failed\n");
     exit(OFFLOAD_FAIL);
   }
 

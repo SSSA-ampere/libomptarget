@@ -46,12 +46,13 @@ int32_t GenericProvider::parse_config(INIReader *reader) {
   };
 
   if (!hinfo.ServAddress.compare("") || !hinfo.UserName.compare("")) {
-    DP("Invalid values in 'cloud_rtl.ini' for HDFS!");
-    return OFFLOAD_FAIL;
+    fprintf(stderr, "Invalid values in configuration file for HDFS!");
+    exit(EXIT_FAILURE);
   }
 
-  DP("HDFS HostName: '%s' - Port: '%d' - User: '%s'\n",
-     hinfo.ServAddress.c_str(), hinfo.ServPort, hinfo.UserName.c_str());
+  if (spark.VerboseMode != Verbosity::quiet)
+    DP("HDFS HostName: '%s' - Port: '%d' - User: '%s'\n",
+       hinfo.ServAddress.c_str(), hinfo.ServPort, hinfo.UserName.c_str());
 
   return OFFLOAD_SUCCESS;
 }
@@ -67,9 +68,9 @@ int32_t GenericProvider::init_device() {
   fs = hdfsBuilderConnect(builder);
 
   if (fs == NULL) {
-    DP("Connection problem with HDFS cluster. Check your configuration in "
-       "'cloud_rtl.ini'.\n");
-    exit(OFFLOAD_FAIL);
+    fprintf(stderr, "Connection problem with HDFS cluster. Check your "
+                    "configuration file.\n");
+    exit(EXIT_FAILURE);
   }
 
   hdfsFreeBuilder(builder);
@@ -77,8 +78,8 @@ int32_t GenericProvider::init_device() {
   if (hdfsExists((hdfsFS)fs, spark.WorkingDir.c_str()) < 0) {
     retval = hdfsCreateDirectory((hdfsFS)fs, spark.WorkingDir.c_str());
     if (retval < 0) {
-      DP("ERROR: Cannot create HDFS working directory\n");
-      exit(OFFLOAD_FAIL);
+      fprintf(stderr, "ERROR: Cannot create HDFS working directory\n");
+      exit(EXIT_FAILURE);
     }
   }
 
@@ -89,22 +90,23 @@ int32_t GenericProvider::send_file(std::string filename,
                                    std::string tgtfilename) {
   std::string final_name = spark.WorkingDir + std::string(tgtfilename);
 
-  DP("submitting file %s as %s\n", filename.c_str(), final_name.c_str());
+  if (spark.VerboseMode != Verbosity::quiet)
+    DP("submitting file %s as %s\n", filename.c_str(), final_name.c_str());
 
   hdfsFile file =
       hdfsOpenFile((hdfsFS)fs, final_name.c_str(), O_WRONLY, BUFF_SIZE, 0, 0);
 
   if (file == NULL) {
-    DP("ERROR: Opening file in HDFS failed.\n");
-    exit(OFFLOAD_FAIL);
+    fprintf(stderr, "ERROR: Opening file in HDFS failed.\n");
+    exit(EXIT_FAILURE);
   }
 
   std::ifstream hstfile(filename, std::ios::in | std::ios::binary);
 
   if (!hstfile.is_open()) {
-    DP("ERROR: Opening host file %s failed.", filename.c_str());
+    fprintf(stderr, "ERROR: Opening host file %s failed.", filename.c_str());
     hdfsCloseFile((hdfsFS)fs, file);
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   char *buffer = new char[4096]();
@@ -122,9 +124,9 @@ int32_t GenericProvider::send_file(std::string filename,
     retval = hdfsWrite((hdfsFS)fs, file, buffer, hstfile.gcount());
 
     if (retval < 0) {
-      DP("ERROR: Writing on HDFS failed.\n");
+      fprintf(stderr, "ERROR: Writing on HDFS failed.\n");
       hdfsCloseFile((hdfsFS)fs, file);
-      exit(OFFLOAD_FAIL);
+      exit(EXIT_FAILURE);
     }
 
     if (hstfile.eof()) {
@@ -137,8 +139,8 @@ int32_t GenericProvider::send_file(std::string filename,
   retval = hdfsCloseFile((hdfsFS)fs, file);
 
   if (retval < 0) {
-    DP("ERROR: Closing on HDFS failed.\n");
-    exit(OFFLOAD_FAIL);
+    fprintf(stderr, "ERROR: Closing on HDFS failed.\n");
+    exit(EXIT_FAILURE);
   }
 
   return OFFLOAD_SUCCESS;
@@ -150,14 +152,15 @@ int32_t GenericProvider::get_file(std::string host_filename,
 
   std::ofstream hostfile(host_filename);
   if (!hostfile.is_open()) {
-    DP("ERROR: Failed to open temporary file\n");
-    exit(OFFLOAD_FAIL);
+    fprintf(stderr, "ERROR: Failed to open temporary file\n");
+    exit(EXIT_FAILURE);
   }
 
   int retval = hdfsExists((hdfsFS)fs, filename.c_str());
   if (retval < 0) {
-    DP("ERROR: File does not exist on HDFS %s\n", filename.c_str());
-    exit(OFFLOAD_FAIL);
+    fprintf(stderr, "ERROR: File does not exist on HDFS %s\n",
+            filename.c_str());
+    exit(EXIT_FAILURE);
   }
 
   hdfsFileInfo *fileInfo = hdfsGetPathInfo((hdfsFS)fs, filename.c_str());
@@ -165,8 +168,8 @@ int32_t GenericProvider::get_file(std::string host_filename,
 
   hdfsFile file = hdfsOpenFile((hdfsFS)fs, filename.c_str(), O_RDONLY, 0, 0, 0);
   if (file == NULL) {
-    DP("ERROR: Opening failed on HDFS %s\n", filename.c_str());
-    exit(OFFLOAD_FAIL);
+    fprintf(stderr, "ERROR: Opening failed on HDFS %s\n", filename.c_str());
+    exit(EXIT_FAILURE);
   }
 
   // Retrieve data by packet
@@ -176,21 +179,21 @@ int32_t GenericProvider::get_file(std::string host_filename,
   do {
     retval = hdfsRead((hdfsFS)fs, file, (void *)buffer, BUFF_SIZE);
     if (retval < 0) {
-      DP("Reading failed on HDFS %s.\n", filename.c_str());
-      exit(OFFLOAD_FAIL);
+      fprintf(stderr, "Reading failed on HDFS %s.\n", filename.c_str());
+      exit(EXIT_FAILURE);
     }
     current_pos += retval;
     // FIXME: Strange fix to avoid slow reading
     // sleep(0);
-    printf("Reading %d bytes\n", retval);
+    // fprintf(stdout, "Reading %d bytes\n", retval);
 
     hostfile.write(buffer, BUFF_SIZE);
   } while (current_pos != size);
 
   retval = hdfsCloseFile((hdfsFS)fs, file);
   if (retval < 0) {
-    DP("Closing file on HDFS failed %s.\n", filename.c_str());
-    exit(OFFLOAD_FAIL);
+    fprintf(stderr, "Closing file on HDFS failed %s.\n", filename.c_str());
+    exit(EXIT_FAILURE);
   }
 
   hostfile.close();
@@ -203,8 +206,8 @@ int32_t GenericProvider::delete_file(std::string filename) {
 
   int retval = hdfsDelete((hdfsFS)fs, filename.c_str(), 0);
   if (retval < 0) {
-    DP("ERROR: Deleting HDFS file failed.\n");
-    exit(OFFLOAD_FAIL);
+    fprintf(stderr, "ERROR: Deleting HDFS file failed.\n");
+    exit(EXIT_FAILURE);
   }
 
   return OFFLOAD_SUCCESS;
@@ -227,8 +230,10 @@ int32_t GenericProvider::submit_cluster() {
 
   // init ssh session
   ssh_session session = ssh_new();
-  if (session == NULL)
-    exit(-1);
+  if (session == NULL) {
+    fprintf(stderr, "ERROR: Cannot create ssh channel.\n");
+    exit(EXIT_FAILURE);
+  }
 
   int verbosity = SSH_LOG_NOLOG;
   int port = 22;
@@ -242,24 +247,25 @@ int32_t GenericProvider::submit_cluster() {
   if (rc != SSH_OK) {
     fprintf(stderr, "ERROR: connection to ssh server failed: %s\n",
             ssh_get_error(session));
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   // Verify the server's identity
   if (ssh_verify_knownhost(session) < 0) {
     ssh_disconnect(session);
     ssh_free(session);
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   rc = ssh_userauth_publickey_auto(session, spark.UserName.c_str(), NULL);
   if (rc == SSH_AUTH_ERROR) {
     fprintf(stderr, "Authentication failed: %s\n", ssh_get_error(session));
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   // Copy jar file
-  DP("Send Spark JAR file to the cluster driver\n");
+  if (spark.VerboseMode != Verbosity::quiet)
+    DP("Send Spark JAR file to the cluster driver\n");
   std::string JarFileName = "SparkJob-OmpCloud-" + random_string(8) + ".jar";
 
   rc = ssh_copy(session, spark.JarPath.c_str(), "/tmp/", JarFileName.c_str());
@@ -267,24 +273,26 @@ int32_t GenericProvider::submit_cluster() {
   if (rc != SSH_OK) {
     fprintf(stderr, "ERROR: Copy of the JAR file failed: %s\n",
             ssh_get_error(session));
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   // Run Spark
-  DP("Submit Spark job to the cluster driver\n");
+  if (spark.VerboseMode != Verbosity::quiet)
+    DP("Submit Spark job to the cluster driver\n");
   std::string cmd = spark.BinPath + "spark-submit --master spark://" +
                     spark.ServAddress + ":" + std::to_string(spark.ServPort) +
                     " " + spark.AdditionalArgs + " --class " + spark.Package +
                     " --name \"" + __progname + "\" /tmp/" + JarFileName + " " +
                     get_job_args();
 
-  DP("Executing SSH command: %s\n", cmd.c_str());
+  if (spark.VerboseMode != Verbosity::quiet)
+    DP("Executing SSH command: %s\n", cmd.c_str());
 
   rc = ssh_run(session, cmd.c_str(), spark.VerboseMode != Verbosity::quiet);
   if (rc != SSH_OK) {
     fprintf(stderr, "ERROR: Spark job execution through SSH failed %s\n",
             ssh_get_error(session));
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   ssh_disconnect(session);
@@ -299,7 +307,7 @@ int32_t GenericProvider::submit_condor() {
   // init ssh session
   ssh_session session = ssh_new();
   if (session == NULL)
-    exit(-1);
+    exit(EXIT_FAILURE);
 
   int verbosity = SSH_LOG_NOLOG;
   int port = 22;
@@ -312,20 +320,20 @@ int32_t GenericProvider::submit_condor() {
   rc = ssh_connect(session);
   if (rc != SSH_OK) {
     fprintf(stderr, "Error connecting to server: %s\n", ssh_get_error(session));
-    exit (OFFLOAD_FAIL);
+    exit(OFFLOAD_FAIL);
   }
 
   // Verify the server's identity
   if (ssh_verify_knownhost(session) < 0) {
     ssh_disconnect(session);
     ssh_free(session);
-    exit (OFFLOAD_FAIL);
+    exit(OFFLOAD_FAIL);
   }
 
   rc = ssh_userauth_publickey_auto(session, spark.UserName.c_str(), NULL);
   if (rc == SSH_AUTH_ERROR) {
     fprintf(stderr, "Authentication failed: %s\n", ssh_get_error(session));
-    exit (OFFLOAD_FAIL);
+    exit(OFFLOAD_FAIL);
   }
 
   std::string path = "/home/sparkcluster/";
@@ -333,7 +341,7 @@ int32_t GenericProvider::submit_condor() {
   // Copy jar file
   rc = ssh_copy(session, spark.JarPath.c_str(), path.c_str(), "spark_job.jar");
   if (rc != SSH_OK) {
-    exit (OFFLOAD_FAIL);
+    exit(OFFLOAD_FAIL);
   }
 
   // Run Spark
@@ -350,7 +358,7 @@ int32_t GenericProvider::submit_condor() {
 
   rc = ssh_run(session, cmd.c_str(), spark.VerboseMode != Verbosity::quiet);
   if (rc != SSH_OK) {
-    exit (OFFLOAD_FAIL);
+    exit(OFFLOAD_FAIL);
   }
 
   ssh_disconnect(session);
@@ -371,7 +379,8 @@ int32_t GenericProvider::submit_local() {
   cmd += " " + get_job_args();
 
   if (execute_command(cmd.c_str(), spark.VerboseMode != Verbosity::quiet)) {
-    return OFFLOAD_FAIL;
+    fprintf(stderr, "ERROR: Spark job failed\n");
+    exit(EXIT_FAILURE);
   }
 
   return OFFLOAD_SUCCESS;

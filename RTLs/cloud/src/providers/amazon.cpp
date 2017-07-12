@@ -38,7 +38,7 @@ CloudProvider *createAmazonProvider(ResourceInfo &resources) {
 
 int32_t AmazonProvider::parse_config(INIReader *reader) {
   ainfo.Bucket = reader->Get("AmazonProvider", "Bucket", DEFAULT_AWS_BUCKET);
-  if (ainfo.Bucket.empty())
+  if (ainfo.Bucket.empty() && spark.VerboseMode != Verbosity::quiet)
     DP("WARNING: Did not find S3 bucket name, use default.\n");
 
   ainfo.AccessKey = reader->Get("AmazonProvider", "AccessKey", "");
@@ -47,8 +47,8 @@ int32_t AmazonProvider::parse_config(INIReader *reader) {
       ainfo.AccessKey = std::string(envAccessKey);
     }
     if (ainfo.AccessKey.empty()) {
-      DP("ERROR: Did not find AWS Access Key.\n");
-      exit(OFFLOAD_FAIL);
+      fprintf(stderr, "ERROR: Did not find AWS Access Key.\n");
+      exit(EXIT_FAILURE);
     }
   }
 
@@ -58,8 +58,8 @@ int32_t AmazonProvider::parse_config(INIReader *reader) {
       ainfo.SecretKey = std::string(envSecretKey);
     }
     if (ainfo.SecretKey.empty()) {
-      DP("ERROR: Did not find AWS Secret Key.\n");
-      exit(OFFLOAD_FAIL);
+      fprintf(stderr, "ERROR: Did not find AWS Secret Key.\n");
+      exit(EXIT_FAILURE);
     }
   }
 
@@ -90,9 +90,9 @@ int32_t AmazonProvider::send_file(std::string filename,
   command += " " + get_cloud_path(std::string(tgtfilename));
   command += " " + get_keys();
 
-  if (execute_command(command.c_str(), true)) {
-    DP("ERROR: s3cmd failed: %s\n", command.c_str());
-    exit(OFFLOAD_FAIL);
+  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+    fprintf(stderr, "ERROR: s3cmd failed: %s\n", command.c_str());
+    exit(EXIT_FAILURE);
   }
 
   return OFFLOAD_SUCCESS;
@@ -106,9 +106,9 @@ int32_t AmazonProvider::get_file(std::string host_filename,
   command += get_cloud_path(filename);
   command += " " + std::string(host_filename) + " " + get_keys();
 
-  if (execute_command(command.c_str(), true)) {
-    DP("s3cmd failed: %s\n", command.c_str());
-    exit(OFFLOAD_FAIL);
+  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+    fprintf(stderr, "s3cmd failed: %s\n", command.c_str());
+    exit(EXIT_FAILURE);
   }
 
   return OFFLOAD_SUCCESS;
@@ -119,8 +119,9 @@ int32_t AmazonProvider::delete_file(std::string filename) {
 
   command += get_cloud_path(filename) + " " + get_keys();
 
-  if (execute_command(command.c_str(), true)) {
-    exit(OFFLOAD_FAIL);
+  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+    fprintf(stderr, "s3cmd failed: %s\n", command.c_str());
+    exit(EXIT_FAILURE);
   }
 
   return OFFLOAD_SUCCESS;
@@ -135,8 +136,8 @@ int32_t AmazonProvider::submit_job() {
   int port = 22;
 
   if (aws_session == NULL) {
-    DP("ERROR: Cannot create ssh session\n")
-    exit(OFFLOAD_FAIL);
+    fprintf(stderr, "ERROR: Cannot create ssh session\n");
+    exit(EXIT_FAILURE);
   }
 
   ssh_options_set(aws_session, SSH_OPTIONS_HOST, spark.ServAddress.c_str());
@@ -148,7 +149,7 @@ int32_t AmazonProvider::submit_job() {
   if (rc != SSH_OK) {
     fprintf(stderr, "ERROR: cannot connect to server: %s\n",
             ssh_get_error(aws_session));
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   // Verify the server's identity
@@ -157,7 +158,7 @@ int32_t AmazonProvider::submit_job() {
             ssh_get_error(aws_session));
     ssh_disconnect(aws_session);
     ssh_free(aws_session);
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   rc = ssh_userauth_publickey_auto(aws_session, spark.UserName.c_str(), NULL);
@@ -170,12 +171,13 @@ int32_t AmazonProvider::submit_job() {
     if (rc == SSH_AUTH_ERROR) {
       fprintf(stderr, "ERROR: SSH authentication failed: %s\n",
               ssh_get_error(aws_session));
-      exit(OFFLOAD_FAIL);
+      exit(EXIT_FAILURE);
     }
   }
 
   // Copy jar file
-  DP("Send Spark JAR file to the cluster driver\n");
+  if (spark.VerboseMode != Verbosity::quiet)
+    DP("Send Spark JAR file to the cluster driver\n");
   std::string JarFileName = "SparkJob-OmpCloud-" + random_string(8) + ".jar";
 
   rc = ssh_copy(aws_session, spark.JarPath.c_str(), "/tmp/",
@@ -183,11 +185,12 @@ int32_t AmazonProvider::submit_job() {
   if (rc != SSH_OK) {
     fprintf(stderr, "ERROR: Copy of the JAR file failed: %s\n",
             ssh_get_error(aws_session));
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   // Run Spark
-  DP("Submit Spark job to the cluster driver\n");
+  if (spark.VerboseMode != Verbosity::quiet)
+    DP("Submit Spark job to the cluster driver\n");
   std::string cmd = "export AWS_ACCESS_KEY_ID=" + ainfo.AccessKey +
                     " && export AWS_SECRET_ACCESS_KEY=" + ainfo.SecretKey +
                     " && " + spark.BinPath + "spark-submit --name " + "\"" +
@@ -201,7 +204,7 @@ int32_t AmazonProvider::submit_job() {
   if (rc != SSH_OK) {
     fprintf(stderr, "ERROR: Spark job execution through SSH failed %s\n",
             ssh_get_error(aws_session));
-    exit(OFFLOAD_FAIL);
+    exit(EXIT_FAILURE);
   }
 
   ssh_disconnect(aws_session);

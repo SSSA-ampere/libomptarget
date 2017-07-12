@@ -14,16 +14,16 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
-#include <ftw.h>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
 
- #include <unistd.h>
-#include <sys/types.h>
- #include <dirent.h>
+#include <dirent.h>
+#include <ftw.h>
 #include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "cloud_util.h"
 
@@ -100,7 +100,7 @@ int remove_directory(const char *path) {
       }
 
       len = path_len + strlen(p->d_name) + 2;
-      buf = (char*) malloc(len);
+      buf = (char *)malloc(len);
 
       if (buf) {
         struct stat statbuf;

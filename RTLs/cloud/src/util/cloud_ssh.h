@@ -16,8 +16,6 @@
 
 #include <libssh/libssh.h>
 
-#include "omptarget.h"
-
 int ssh_verify_knownhost(ssh_session session);
 
 int ssh_copy(ssh_session session, const char *filename, const char *destpath,

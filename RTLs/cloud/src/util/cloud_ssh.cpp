@@ -17,8 +17,6 @@
 #include <cstring>
 
 #include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include "cloud_ssh.h"
 
@@ -89,7 +87,7 @@ int ssh_copy(ssh_session session, const char *filename, const char *destpath,
 
   if (!file) {
     fprintf(stderr, "ERROR: Could not open temporary file.\n");
-    return OFFLOAD_FAIL;
+    return SSH_ERROR;
   }
 
   ssh_scp scp;
@@ -126,7 +124,7 @@ int ssh_copy(ssh_session session, const char *filename, const char *destpath,
   if (fread(fbuffer, 1, size, file) != size) {
     fprintf(stderr, "Could not successfully read temporary file.\n");
     fclose(file);
-    return OFFLOAD_FAIL;
+    return SSH_ERROR;
   }
 
   rc = ssh_scp_write(scp, fbuffer, size);
@@ -139,7 +137,7 @@ int ssh_copy(ssh_session session, const char *filename, const char *destpath,
   ssh_scp_close(scp);
   ssh_scp_free(scp);
 
-  return OFFLOAD_SUCCESS;
+  return SSH_OK;
 }
 
 int ssh_run(ssh_session session, const char *cmd, bool print_result) {
@@ -167,7 +165,8 @@ int ssh_run(ssh_session session, const char *cmd, bool print_result) {
 
   nbytes = ssh_channel_read(channel, buffer, sizeof(buffer), 1);
   while (nbytes > 0) {
-    if (print_result && fwrite(buffer, 1, nbytes, stdout) != (unsigned int)nbytes) {
+    if (print_result &&
+        fwrite(buffer, 1, nbytes, stdout) != (unsigned int)nbytes) {
       fprintf(stderr, "Problem when displaying ssh buffer\n");
       ssh_channel_close(channel);
       ssh_channel_free(channel);
