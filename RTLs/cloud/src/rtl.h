@@ -44,13 +44,9 @@ struct SparkInfo {
   uintptr_t currAddr;
 };
 
-struct ResourceInfo {
-  struct SparkInfo Spark;
-};
-
 struct ProviderListEntry {
   std::string ProviderName;
-  CloudProvider *(*ProviderGenerator)(ResourceInfo &);
+  CloudProvider *(*ProviderGenerator)(SparkInfo &);
   std::string SectionName;
 };
 

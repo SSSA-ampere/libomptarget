@@ -33,8 +33,8 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Generic Provider:", __VA_ARGS__)
 
-CloudProvider *createGenericProvider(ResourceInfo &resources) {
-  return new GenericProvider(resources);
+CloudProvider *createGenericProvider(SparkInfo &sparkInfo) {
+  return new GenericProvider(sparkInfo);
 }
 
 int32_t GenericProvider::parse_config(INIReader *reader) {

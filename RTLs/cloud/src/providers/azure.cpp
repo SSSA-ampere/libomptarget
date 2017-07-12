@@ -32,8 +32,8 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Azure Provider:", __VA_ARGS__)
 
-CloudProvider *createAzureProvider(ResourceInfo &resources) {
-  return new AzureProvider(resources);
+CloudProvider *createAzureProvider(SparkInfo &sparkInfo) {
+  return new AzureProvider(sparkInfo);
 }
 
 int32_t AzureProvider::parse_config(INIReader *reader) {

@@ -257,18 +257,15 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
        spark.Package.c_str(), spark.WorkingDir.c_str());
   }
 
-  DeviceInfo.SparkClusters[device_id] = spark;
-
-  ResourceInfo resources{spark};
-
   // Checking for listed provider. Each device id refers to a provider
   // position in the list
   if (spark.VerboseMode != Verbosity::quiet)
     DP("Creating provider %s\n", ProviderList[device_id].ProviderName.c_str());
 
+  DeviceInfo.SparkClusters[device_id] = spark;
   std::string providerSectionName = ProviderList[device_id].SectionName;
   DeviceInfo.Providers[device_id] =
-      ProviderList[device_id].ProviderGenerator(resources);
+      ProviderList[device_id].ProviderGenerator(spark);
   DeviceInfo.Providers[device_id]->parse_config(DeviceInfo.reader);
   DeviceInfo.Providers[device_id]->init_device();
 

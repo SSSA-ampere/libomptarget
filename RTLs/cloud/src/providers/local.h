@@ -16,11 +16,11 @@
 
 #include "provider.h"
 
-CloudProvider *createLocalProvider(ResourceInfo &resources);
+CloudProvider *createLocalProvider(SparkInfo &sparkInfo);
 
 class LocalProvider : public CloudProvider  {
 public:
-  LocalProvider(ResourceInfo resources) : CloudProvider(resources) {}
+  LocalProvider(SparkInfo resources) : CloudProvider(resources) {}
   ~LocalProvider();
 
   std::string get_cloud_path(std::string filename);

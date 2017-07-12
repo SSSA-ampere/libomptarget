@@ -27,14 +27,14 @@ struct AmazonInfo {
 
 const std::string DEFAULT_AWS_BUCKET = "ompcloud-bucket";
 
-CloudProvider *createAmazonProvider(ResourceInfo &resources);
+CloudProvider *createAmazonProvider(SparkInfo &sparkInfo);
 
 class AmazonProvider : public CloudProvider {
 private:
   AmazonInfo ainfo;
 
 public:
-  AmazonProvider(ResourceInfo resources) : CloudProvider(resources) {}
+  AmazonProvider(SparkInfo resources) : CloudProvider(resources) {}
 
   std::string get_keys();
   std::string get_cloud_path(std::string filename);

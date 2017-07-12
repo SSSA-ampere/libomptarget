@@ -32,8 +32,8 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Amazon Provider:", __VA_ARGS__)
 
-CloudProvider *createAmazonProvider(ResourceInfo &resources) {
-  return new AmazonProvider(resources);
+CloudProvider *createAmazonProvider(SparkInfo &sparkInfo) {
+  return new AmazonProvider(sparkInfo);
 }
 
 int32_t AmazonProvider::parse_config(INIReader *reader) {

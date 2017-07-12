@@ -25,7 +25,7 @@ struct HdfsInfo {
 const int DEFAULT_HDFS_PORT = 9000;
 const int BUFF_SIZE = 4096;
 
-CloudProvider *createGenericProvider(ResourceInfo &resources);
+CloudProvider *createGenericProvider(SparkInfo &sparkInfo);
 
 class GenericProvider : public CloudProvider {
 protected:
@@ -36,7 +36,7 @@ protected:
   int32_t submit_local();
 
 public:
-  GenericProvider(ResourceInfo resources) : CloudProvider(resources) {}
+  GenericProvider(SparkInfo sparkInfo) : CloudProvider(sparkInfo) {}
 
   virtual int32_t parse_config(INIReader *reader);
   virtual int32_t init_device();

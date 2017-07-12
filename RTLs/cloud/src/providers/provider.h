@@ -22,8 +22,8 @@ protected:
   char *currAddr;
 
 public:
-  CloudProvider(ResourceInfo &resources) {
-    spark = resources.Spark;
+  CloudProvider(SparkInfo &sparkInfo) {
+    spark = sparkInfo;
     currAddr = (char *)1;
   }
 

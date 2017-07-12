@@ -26,14 +26,14 @@ struct AzureInfo {
 
 const std::string DEFAULT_AZURE_CONTAINER = "ompcloud-container";
 
-CloudProvider *createAzureProvider(ResourceInfo &resources);
+CloudProvider *createAzureProvider(SparkInfo &sparkInfo);
 
 class AzureProvider : public CloudProvider {
 private:
   AzureInfo ainfo;
 
 public:
-  AzureProvider(ResourceInfo resources) : CloudProvider(resources) {}
+  AzureProvider(SparkInfo resources) : CloudProvider(resources) {}
 
   std::string get_keys();
   std::string get_cloud_path(std::string filename);

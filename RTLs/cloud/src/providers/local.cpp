@@ -39,8 +39,8 @@ LocalProvider::~LocalProvider() {
     remove_directory(working_path.c_str());
 }
 
-CloudProvider *createLocalProvider(ResourceInfo &resources) {
-  return new LocalProvider(resources);
+CloudProvider *createLocalProvider(SparkInfo &sparkInfo) {
+  return new LocalProvider(sparkInfo);
 }
 
 int32_t LocalProvider::parse_config(INIReader *reader) {
