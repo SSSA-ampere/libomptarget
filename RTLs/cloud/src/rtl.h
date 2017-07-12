@@ -97,6 +97,8 @@ public:
 
   INIReader *reader;
 
+  Verbosity verbose;
+
   std::vector<SparkInfo> SparkClusters;
   std::vector<CloudProvider *> Providers;
   std::vector<std::string> AddressTables;
