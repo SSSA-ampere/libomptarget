@@ -16,8 +16,6 @@
 
 #include "rtl.h"
 
-const int BUFF_SIZE = 4096;
-
 class CloudProvider {
 protected:
   SparkInfo spark;

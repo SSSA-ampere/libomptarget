@@ -23,7 +23,7 @@ struct DynLibTy {
 
 extern const char *__progname; /* for job name */
 
-enum SparkMode { client, cluster, condor, invalid };
+enum SparkMode { client, cluster, invalid };
 enum Verbosity { debug, info, quiet };
 
 struct SparkInfo {
@@ -34,7 +34,6 @@ struct SparkInfo {
   std::string BinPath;
   std::string Package;
   std::string JarPath;
-  int PollInterval;
   std::string AdditionalArgs;
   std::string WorkingDir;
   bool Compression;
@@ -67,14 +66,13 @@ struct ElapsedTime {
   int SparkExecutionTime = 0;
 };
 
-#define OMPCLOUD_CONF_ENV "OMPCLOUD_CONF_PATH"
-#define DEFAULT_HDFS_PORT 9000
-#define DEFAULT_SPARK_PORT 7077
-#define DEFAULT_SPARK_USER "anonymous"
-#define DEFAULT_SPARK_MODE "client"
-#define DEFAULT_SPARK_PACKAGE "org.llvm.openmp.OmpKernel"
-#define DEFAULT_SPARK_JARPATH "target/scala-2.11/test-assembly-0.2.0.jar"
-#define DEFAULT_SPARK_POLLINTERVAL 300
+const std::string OMPCLOUD_CONF_ENV = "OMPCLOUD_CONF_PATH";
+const int DEFAULT_SPARK_PORT = 7077;
+const std::string DEFAULT_SPARK_USER = "anonymous";
+const std::string DEFAULT_SPARK_MODE = "client";
+const std::string DEFAULT_SPARK_PACKAGE = "org.llvm.openmp.OmpKernel";
+const std::string DEFAULT_SPARK_JARPATH =
+    "target/scala-2.11/test-assembly-0.2.0.jar";
 
 // Only data larger than about 1MB are compressed
 const int MIN_SIZE_COMPRESSION = 1000000;
@@ -97,7 +95,7 @@ class RTLDeviceInfoTy {
 public:
   int NumberOfDevices;
 
-  INIReader* reader;
+  INIReader *reader;
 
   std::vector<SparkInfo> SparkClusters;
   std::vector<CloudProvider *> Providers;

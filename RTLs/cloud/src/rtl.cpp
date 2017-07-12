@@ -62,8 +62,10 @@ static std::string working_path;
 static char *library_tmpfile = strdup("/tmp/libompcloudXXXXXX");
 
 RTLDeviceInfoTy::RTLDeviceInfoTy() {
-  std::string ConfigPath = std::string(getenv(OMPCLOUD_CONF_ENV));
+  std::string ConfigPath = std::string(getenv(OMPCLOUD_CONF_ENV.c_str()));
   reader = new INIReader(ConfigPath);
+
+  std::string verbose = DeviceInfo.reader->Get("Spark", "VerboseMode", "info");
 
   if (reader->ParseError() < 0) {
     fprintf(stderr, "ERROR: Path to OmpCloud configuration seems wrong: %s\n",
@@ -186,8 +188,6 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
     mode = SparkMode::client;
   } else if (smode == "cluster") {
     mode = SparkMode::cluster;
-  } else if (smode == "condor") {
-    mode = SparkMode::condor;
   } else {
     mode = SparkMode::invalid;
   }
@@ -216,8 +216,6 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       DeviceInfo.reader->Get("Spark", "BinPath", ""),
       DeviceInfo.reader->Get("Spark", "Package", DEFAULT_SPARK_PACKAGE),
       DeviceInfo.reader->Get("Spark", "JarPath", DEFAULT_SPARK_JARPATH),
-      (int)DeviceInfo.reader->GetInteger("Spark", "PollInterval",
-                                         DEFAULT_SPARK_POLLINTERVAL),
       DeviceInfo.reader->Get("Spark", "AdditionalArgs", ""),
       DeviceInfo.reader->Get("Spark", "WorkingDir", ""),
       DeviceInfo.reader->GetBoolean("Spark", "Compression", true),

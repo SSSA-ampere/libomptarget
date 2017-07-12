@@ -22,6 +22,9 @@ struct HdfsInfo {
   std::string UserName;
 };
 
+const int DEFAULT_HDFS_PORT = 9000;
+const int BUFF_SIZE = 4096;
+
 CloudProvider *createGenericProvider(ResourceInfo &resources);
 
 class GenericProvider : public CloudProvider {
@@ -31,7 +34,6 @@ protected:
 
   int32_t submit_cluster();
   int32_t submit_local();
-  int32_t submit_condor();
 
 public:
   GenericProvider(ResourceInfo resources) : CloudProvider(resources) {}
