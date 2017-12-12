@@ -223,6 +223,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       DeviceInfo.reader->GetBoolean("Spark", "UseThreads", true),
       DeviceInfo.verbose,
       DeviceInfo.reader->GetBoolean("Spark", "KeepTmpFiles", false),
+      DeviceInfo.reader->GetInteger("Spark", "TilingRatio", 1),
       1,
   };
 

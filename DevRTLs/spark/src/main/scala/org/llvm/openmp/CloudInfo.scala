@@ -34,6 +34,8 @@ class CloudInfo(args: Array[String]) {
   val uri = args(1)
   val username = args(2)
   val path = args(3)
+  val compress = args(4)
+  val ratio = args(5).toLong
 
   val conf = new SparkConf().set("spark.driver.maxResultSize", "0")
 
@@ -46,8 +48,8 @@ class CloudInfo(args: Array[String]) {
   filesystem match {
     case "S3" =>
       fsConf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-      fsConf.set("fs.s3a.awsAccessKeyId", args(4))
-      fsConf.set("fs.s3a.awsSecretAccessKey", args(5))
+      fsConf.set("fs.s3a.awsAccessKeyId", args(6))
+      fsConf.set("fs.s3a.awsSecretAccessKey", args(7))
     case "HDFS" =>
       System.setProperty("HADOOP_USER_NAME", username)
     case "FILE" =>

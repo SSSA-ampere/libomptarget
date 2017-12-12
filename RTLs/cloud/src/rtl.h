@@ -41,6 +41,7 @@ struct SparkInfo {
   bool UseThreads;
   Verbosity VerboseMode;
   bool KeepTmpFiles;
+  long TilingRatio;
   uintptr_t currAddr;
 };
 

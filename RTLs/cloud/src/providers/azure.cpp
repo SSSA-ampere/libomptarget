@@ -250,5 +250,8 @@ std::string AzureProvider::get_job_args() {
   else
     args += " false";
 
+  // Custom ratio to adjust tiling
+  args += " " + std::to_string(spark.TilingRatio);
+
   return args;
 }
