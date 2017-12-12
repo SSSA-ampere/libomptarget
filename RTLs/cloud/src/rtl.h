@@ -41,7 +41,8 @@ struct SparkInfo {
   bool UseThreads;
   Verbosity VerboseMode;
   bool KeepTmpFiles;
-  long TilingRatio;
+  std::string SchedulingSize;
+  std::string SchedulingKind;
   uintptr_t currAddr;
 };
 

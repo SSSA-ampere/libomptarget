@@ -226,8 +226,8 @@ std::string AmazonProvider::get_job_args() {
   else
     args += " false";
 
-  // Custom ratio to adjust tiling
-  args += " " + std::to_string(spark.TilingRatio);
+  args += " " + spark.SchedulingSize;
+  args += " " + spark.SchedulingKind;
 
   return args;
 }
