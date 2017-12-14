@@ -57,8 +57,6 @@ static std::vector<struct ProviderListEntry> ProviderList;
 
 static RTLDeviceInfoTy DeviceInfo;
 
-static std::string working_path;
-
 static char *library_tmpfile = strdup("/tmp/libompcloudXXXXXX");
 
 RTLDeviceInfoTy::RTLDeviceInfoTy() {
@@ -83,12 +81,7 @@ RTLDeviceInfoTy::RTLDeviceInfoTy() {
     verbose = Verbosity::info;
   }
 
-  char *tempdir = mkdtemp(strdup("/tmp/ompcloud.XXXXXX"));
-  if (tempdir == NULL) {
-    fprintf(stderr, "Error on mkdtemp\n");
-    exit(EXIT_FAILURE);
-  }
-  working_path = tempdir;
+  working_path = std::string("/tmp/ompcloud.") + random_string(6);
   std::string cmd("mkdir -p " + working_path);
 
   DP("%s\n", exec_cmd(cmd.c_str()).c_str());
@@ -277,17 +270,6 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
                                           __tgt_device_image *image) {
 
-  char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
-  char *tempdir = mkdtemp(tempdir_template);
-  if (tempdir == NULL) {
-    DP("ERROR: Error on mkdtemp\n");
-    exit(EXIT_FAILURE);
-  }
-  working_path = tempdir;
-  std::string cmd("mkdir -p " + working_path);
-  if (DeviceInfo.verbose == Verbosity::debug)
-    DP("%s\n", exec_cmd(cmd.c_str()).c_str());
-
   if (DeviceInfo.verbose != Verbosity::quiet)
     DP("Dev %d: load binary from 0x%llx image\n", device_id,
        (long long)image->ImageStart);
@@ -460,7 +442,7 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
   // Since we now need the hdfs file, we create it here
   std::string filename = std::to_string(id);
-  std::string host_filepath = working_path + "/" + filename;
+  std::string host_filepath = DeviceInfo.working_path + "/" + filename;
 
   int64_t sendingSize;
   if (needCompression) {
@@ -525,7 +507,7 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                            size >= MIN_SIZE_COMPRESSION;
 
   std::string filename = std::to_string(id);
-  std::string host_filepath = working_path + "/" + filename;
+  std::string host_filepath = DeviceInfo.working_path + "/" + filename;
 
   auto t_start = std::chrono::high_resolution_clock::now();
   DeviceInfo.Providers[device_id]->get_file(host_filepath, filename);

@@ -32,7 +32,7 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Local Provider:", __VA_ARGS__)
 
-static std::string working_path;
+static const std::string working_path = "/tmp/ompcloud.local." + random_string(8);
 
 LocalProvider::~LocalProvider() {
   if (!spark.KeepTmpFiles)
@@ -48,15 +48,7 @@ int32_t LocalProvider::parse_config(INIReader *reader) {
 }
 
 int32_t LocalProvider::init_device() {
-  int retval;
   // Create the working folder
-  char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
-  char *tempdir = mkdtemp(tempdir_template);
-  if (tempdir == NULL) {
-    perror("ERROR: generating temp folder name\n");
-    exit(OFFLOAD_FAIL);
-  }
-  working_path = tempdir;
   std::string cmd("mkdir -p " + working_path + "/" + spark.WorkingDir);
   exec_cmd(cmd.c_str());
   return OFFLOAD_SUCCESS;

@@ -93,6 +93,8 @@ class RTLDeviceInfoTy {
 public:
   int NumberOfDevices;
 
+  std::string working_path;
+
   INIReader *reader;
 
   Verbosity verbose;
