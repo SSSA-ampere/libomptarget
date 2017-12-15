@@ -32,7 +32,8 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Local Provider:", __VA_ARGS__)
 
-static const std::string working_path = "/tmp/ompcloud.local." + random_string(8);
+static const std::string working_path =
+    "/tmp/ompcloud.local." + random_string(8);
 
 LocalProvider::~LocalProvider() {
   if (!spark.KeepTmpFiles)
@@ -98,7 +99,8 @@ int32_t LocalProvider::submit_job() {
   // Execution arguments pass to the spark kernel
   cmd += " " + get_job_args();
 
-  if (execute_command(cmd.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+  if (execute_command(cmd.c_str(), spark.VerboseMode != Verbosity::quiet,
+                      spark.VerboseMode == Verbosity::debug)) {
     fprintf(stderr, "ERROR: Spark job failed\n");
     exit(OFFLOAD_FAIL);
   }
