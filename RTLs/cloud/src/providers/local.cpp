@@ -88,7 +88,7 @@ int32_t LocalProvider::submit_job() {
   if (spark.VerboseMode != Verbosity::quiet)
     DP("Submit Spark job\n");
 
-  std::string cmd = "spark-submit";
+  std::string cmd = spark.BinPath + "spark-submit";
 
   // Spark job entry point
   cmd += " " + spark.AdditionalArgs;

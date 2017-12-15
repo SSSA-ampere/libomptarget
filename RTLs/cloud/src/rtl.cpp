@@ -221,14 +221,26 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       1,
   };
 
-  // Checking if given WorkingDir ends in a slash for path concatenation.
-  // If it doesn't, add it
+  if (spark.WorkingDir.empty()) {
+    spark.WorkingDir = "ompcloud.workingdir" + random_string(8);
+  }
+
+  // Checking if given WorkingDir and BinPath ends in a slash for path
+  // concatenation. If it doesn't, add it!
   if (spark.WorkingDir.back() != '/') {
     spark.WorkingDir += "/";
   }
 
-  if (spark.WorkingDir.empty()) {
-    spark.WorkingDir = "ompcloud." + random_string(8);
+  if (!spark.BinPath.empty()) {
+    if (spark.BinPath.back() != '/') {
+      spark.BinPath += "/";
+    }
+
+    std::ifstream sparkSubmit((spark.BinPath + "spark-submit").c_str());
+    if (!sparkSubmit.good()) {
+      DP("ERROR: spark-submit is not accessible\n");
+      exit(EXIT_FAILURE);
+    }
   }
 
   if (spark.ServAddress.empty()) {
@@ -238,9 +250,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
     }
   }
 
-  if (spark.Mode == SparkMode::invalid || !spark.Package.compare("") ||
-      !spark.JarPath.compare("")) {
-    DP("ERROR: Invalid values in 'cloud_rtl.ini' for Spark!");
+  if (spark.Mode == SparkMode::invalid) {
+    DP("ERROR: Invalid Spark execution mode\n");
     exit(EXIT_FAILURE);
   }
 
