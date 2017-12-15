@@ -84,7 +84,8 @@ int32_t AzureProvider::init_device() {
   command += " --public-access blob";
   command += " " + get_keys();
 
-  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet,
+                      spark.VerboseMode == Verbosity::debug)) {
     fprintf(stderr, "azure-cli failed: %s\n", command.c_str());
     exit(EXIT_FAILURE);
   }
@@ -112,7 +113,8 @@ int32_t AzureProvider::send_file(std::string filename,
   command += " -n " + get_cloud_path(tgtfilename);
   command += " " + get_keys();
 
-  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet,
+                      spark.VerboseMode == Verbosity::debug)) {
     fprintf(stderr, "azure-cli failed: %s\n", command.c_str());
     exit(EXIT_FAILURE);
   }
@@ -129,7 +131,8 @@ int32_t AzureProvider::get_file(std::string host_filename,
   command += " -f " + host_filename;
   command += " " + get_keys();
 
-  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet,
+                      spark.VerboseMode == Verbosity::debug)) {
     fprintf(stderr, "azure-cli failed: %s\n", command.c_str());
     exit(EXIT_FAILURE);
   }
@@ -143,7 +146,8 @@ int32_t AzureProvider::delete_file(std::string filename) {
   command += " -c " + ainfo.Container;
   command += " " + get_keys();
 
-  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet,
+                      spark.VerboseMode == Verbosity::debug)) {
     fprintf(stderr, "azure-cli failed: %s\n", command.c_str());
     exit(EXIT_FAILURE);
   }

@@ -90,7 +90,8 @@ int32_t AmazonProvider::send_file(std::string filename,
   command += " " + get_cloud_path(std::string(tgtfilename));
   command += " " + get_keys();
 
-  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet,
+                      spark.VerboseMode == Verbosity::debug)) {
     fprintf(stderr, "ERROR: s3cmd failed: %s\n", command.c_str());
     exit(EXIT_FAILURE);
   }
@@ -106,7 +107,8 @@ int32_t AmazonProvider::get_file(std::string host_filename,
   command += get_cloud_path(filename);
   command += " " + std::string(host_filename) + " " + get_keys();
 
-  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet,
+                      spark.VerboseMode == Verbosity::debug)) {
     fprintf(stderr, "s3cmd failed: %s\n", command.c_str());
     exit(EXIT_FAILURE);
   }
@@ -119,7 +121,8 @@ int32_t AmazonProvider::delete_file(std::string filename) {
 
   command += get_cloud_path(filename) + " " + get_keys();
 
-  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+  if (execute_command(command.c_str(), spark.VerboseMode != Verbosity::quiet,
+                      spark.VerboseMode == Verbosity::debug)) {
     fprintf(stderr, "s3cmd failed: %s\n", command.c_str());
     exit(EXIT_FAILURE);
   }

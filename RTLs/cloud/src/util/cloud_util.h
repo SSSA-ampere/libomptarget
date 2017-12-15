@@ -14,11 +14,11 @@
 #ifndef _INCLUDE_UTIL_H_
 #define _INCLUDE_UTIL_H_
 
-std::string exec_cmd(const char* cmd);
+std::string exec_cmd(const char *cmd);
 
-int32_t execute_command(const char *command, bool print_result);
+int32_t execute_command(const char *command, bool print_result, bool print_cmd);
 
-std::string random_string( size_t length );
+std::string random_string(size_t length);
 
 int remove_directory(const char *path);
 

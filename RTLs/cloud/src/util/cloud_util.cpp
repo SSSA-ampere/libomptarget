@@ -40,10 +40,13 @@ std::string exec_cmd(const char *cmd) {
   return result;
 }
 
-int32_t execute_command(const char *command, bool print_result) {
+int32_t execute_command(const char *command, bool print_result,
+                        bool print_cmd) {
   FILE *fp = popen(command, "r");
 
-  // fprintf(stdout, "Running: %s\n", command);
+  if (print_cmd) {
+    fprintf(stdout, "Running: %s\n", command);
+  }
 
   if (fp == NULL) {
     fprintf(stderr, "ERROR: Failed to execute command\n");
