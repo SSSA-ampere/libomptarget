@@ -353,6 +353,7 @@ std::string GenericProvider::get_job_args() {
 
   args += " " + spark.SchedulingSize;
   args += " " + spark.SchedulingKind;
+  args += " " + std::to_string(spark.VerboseMode);
 
   return args;
 }

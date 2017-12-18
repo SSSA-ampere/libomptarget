@@ -37,6 +37,7 @@ class CloudInfo(args: Array[String]) {
   val compress = args(4)
   val schedulingSize = args(5).toLong
   val schedulingKind = args(6)
+  val verbosity = args(7)
   
   val isDynamic = schedulingKind.equalsIgnoreCase("dynamic")
 
@@ -45,14 +46,21 @@ class CloudInfo(args: Array[String]) {
   val session = SparkSession.builder().config(conf).getOrCreate()
 
   val sc = session.sparkContext
+  
+  verbosity match {
+    case "0" => sc.setLogLevel("DEBUG")
+    case "1" => sc.setLogLevel("INFO")
+    case "2" => sc.setLogLevel("WARN")
+    case _ => throw new RuntimeException("Unsupported verbose mode.") 
+  }
 
   var fsConf = new Configuration
 
   filesystem match {
     case "S3" =>
       fsConf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-      fsConf.set("fs.s3a.awsAccessKeyId", args(7))
-      fsConf.set("fs.s3a.awsSecretAccessKey", args(8))
+      fsConf.set("fs.s3a.awsAccessKeyId", args(8))
+      fsConf.set("fs.s3a.awsSecretAccessKey", args(9))
     case "HDFS" =>
       System.setProperty("HADOOP_USER_NAME", username)
     case "FILE" =>
