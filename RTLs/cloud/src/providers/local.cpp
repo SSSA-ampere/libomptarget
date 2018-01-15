@@ -32,8 +32,6 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Local Provider:", __VA_ARGS__)
 
-static const std::string working_path =
-    "/tmp/ompcloud.local." + random_string(8);
 
 LocalProvider::~LocalProvider() {
   if (!spark.KeepTmpFiles)
@@ -50,6 +48,7 @@ int32_t LocalProvider::parse_config(INIReader *reader) {
 
 int32_t LocalProvider::init_device() {
   // Create the working folder
+  working_path = "/tmp/ompcloud.local." + random_string(8);
   std::string cmd("mkdir -p " + working_path + "/" + spark.WorkingDir);
   exec_cmd(cmd.c_str());
   return OFFLOAD_SUCCESS;

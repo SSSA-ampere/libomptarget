@@ -19,6 +19,9 @@
 CloudProvider *createLocalProvider(SparkInfo &sparkInfo);
 
 class LocalProvider : public CloudProvider  {
+private:
+  std::string working_path;
+
 public:
   LocalProvider(SparkInfo resources) : CloudProvider(resources) {}
   ~LocalProvider();
