@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <ctime>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -70,6 +71,13 @@ int32_t execute_command(const char *command, bool print_result,
 }
 
 std::string random_string(size_t length) {
+  // Initialize pseudo random generator
+  static bool isInit = false;
+  if (!isInit) {
+    srand(time(NULL));
+    isInit = true;
+  }
+
   auto randchar = []() -> char {
     const char charset[] = "0123456789"
                            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
